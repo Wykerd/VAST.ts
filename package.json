@@ -3,8 +3,11 @@
   "version": "0.0.0",
   "description": "",
   "main": "index.js",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build:proto": "npx pb-gen-ts --entry-path=\"src/proto\" --out-dir=\"src/proto/generated\" --ext-in-import=\".js\"",
+    "build:esm": "npx tsc"
   },
   "keywords": [
     "SPS",
@@ -20,5 +23,8 @@
     "pbkit": "^0.0.70",
     "tsx": "^4.15.6",
     "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "tslib": "^2.6.3"
   }
 }
