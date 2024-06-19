@@ -1,0 +1,24 @@
+{
+  "name": "@wykerd/vast",
+  "version": "0.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "SPS",
+    "PubSub",
+    "spatial publish/subscribe",
+    "VON",
+    "P2P"
+  ],
+  "author": "Daniel Wykerd <24731528@sun.ac.za>",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/node": "^20.14.5",
+    "pbkit": "^0.0.70",
+    "tsx": "^4.15.6",
+    "typescript": "^5.4.5"
+  }
+}
