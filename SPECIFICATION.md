@@ -11,6 +11,8 @@ These actions are performed through messages sent between the nodes. Let's look 
 
 ## JOIN
 
+**TODO: ensure this works concurrently as multiple nodes may be joining at the same time**
+
 The following is the procedure for a node to join the network:
 
 1. The *joining node* opens a connection the the *gateway node*. The *gateway node* is any node that is known to be in the network.
@@ -18,11 +20,39 @@ The following is the procedure for a node to join the network:
 3. The *gateway node* assigns a unique ID to the *joining node*.
 4. The *gateway node* acknowledges the *joining node*'s request by sending a *JOIN RESPONSE message* to the *joining node*.
 5. The *gateway node* uses the *point forwarding algorithm* to send a *JOIN QUERY message* to the node whose region contains the *joining node*'s requested position. This node is the *acceptor node*.
-8. The *acceptor node* sends a *WELCOME message* to the *joining node* containing the list of neighboring nodes it considers to be the *joining node*'s enclosing neighbors.
-9. The *joining node* connects to each of the nodes in the provided list and sends them a *HELLO message* to ensure its EN list is correct. 
-...
+6. The *acceptor node* runs the *add node algorithm*.
+7. The *acceptor node* determines the *joining node*'s *EN neighbors* from the constructed *local Voronoi diagram*.
+8. The *acceptor node* sends a *WELCOME message* to the *joining node* containing the estimated list of the *joining node*'s *EN neighbors* from the constructed *local Voronoi diagram*.
+9. The *joining node* creates an set of *EN nodes* from the list of neighboring nodes in the *WELCOME message*.
+10. Using the *EN node set*, the *joining node* creates a *local Voronoi diagram*.
+10. The *joining node* enters a loop:
+    1. Identify the true *EN neighbors* from the constructed *local Voronoi diagram*.
+    2. Send a *HELLO message* to each of the *EN neighbors* that has not yet been contacted. This causes the neighboring node to run the *HELLO procedure*.
+    3. Wait for a *HELLO RESPONSE message* from each of the *EN neighbors*. If it receives a *HELLO REJECT message* from any of the *EN neighbors*, that neighbor is removed from the *EN node set* and discarded in the rest of the below calculations.
+    4. The *HELLO RESPONSE message* contains the *missing EN neighbors* of the *joining node*. Add them to the *EN node set*.
+    5. If the *EN node set* has not changed, exit the loop.
+11. The *joining node* determines its final *EN neighbors* from the constructed *local Voronoi diagram*. It closes any connections to the *EN nodes* in the set that are not its *EN neighbors*.
+
+## HELLO
+
+The *HELLO procedure* is used by a node to establish a connection with its *EN neighbors*. The procedure is as follows:
+
+1. The *node* receives a *HELLO message* from a *joining node*.
+2. The *node* runs the *add node algorithm*.
+5. If the *joining node* is not one of the *EN neighbors*, the join request is invalid and the *node* sends a *HELLO REJECT message* to the *joining node*. The procedure ends here in this case.
+6. The *node* determines its estimate of the *joining node*'s *EN neighbors* from the constructed *local Voronoi diagram*.
+7. The *node* sends a *HELLO RESPONSE message* to the *joining node* containing the *missing EN neighbors* of the *joining node*.
+8. The *node* closes any connections to the *EN nodes* in the set that are not its *EN neighbors*.
 
 # VON Algorithms
+
+## Add Node Algorithm
+
+The *add node algorithm* is used by a *node* to add a *joining node* to its neighborhood. The algorithm is as follows:
+1. The *node* creates a *EN node set* containing its current *EN neighbors* and the *joining node*.
+2. The *node* creates a *local Voronoi diagram* using the *EN node set*.
+3. The *node* determines its new *EN neighbors* from the constructed *local Voronoi diagram*.
+4. The *node* updates its *EN neighbors* to the new set determined from the *local Voronoi diagram*.
 
 ## Point Forwarding Algorithm
 
