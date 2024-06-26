@@ -22,7 +22,17 @@ export class VONConnection extends EventEmitter {
         super();
         this.#conn = conn;
 
-        this.#conn.on('data', data => {
+        this.#conn.setKeepAlive(true);
+
+        this.#conn.on('data', this.#handleTCPData.bind(this));
+        this.#conn.on('close', this.#handleTCPClose.bind(this));
+    }
+
+    #handleTCPClose(didError: boolean) {
+        this.#log('VON: connection closed', didError);
+    }
+
+    #handleTCPData(data: Buffer) {
             this.#recv_chunks.push(new Uint8Array(data.buffer));
 
             const chunk_total_length = this.#recv_chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
@@ -72,8 +82,7 @@ export class VONConnection extends EventEmitter {
             }
 
             this.#recv_chunks = [joined_chunks.slice(viewOffset)];
-        })
-    }
+            }
 
     on(event: 'hello-response', listener: (res: HelloResponseMessage) => unknown): this;
     on(event: 'hello-reject', listener: (res: AcknowledgeMessage) => unknown): this;
