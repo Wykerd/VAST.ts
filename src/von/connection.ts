@@ -1,8 +1,9 @@
 import { Socket } from "node:net";
 import { encodeBinary as encodeVONPacket, decodeBinary as decodeVONPacket } from "~/proto/generated/messages/vast/VONPacket.js";
 import { AcknowledgeMessage, Addr, HelloMessage, HelloResponseMessage, Identity, VONPacket, WelcomeMessage } from "~/proto/generated/messages/vast/index.js";
-import { Vec2d, vec2dFromProtobuf, vec2dToProtobuf } from "~/spatial/types.js";
-import { VONNeighbor, VONNode, deduplicateNeighbors, excludeNeighbors, identityToVONNeighbor, vonNeighborToIdentity } from "./node.js";
+import { vec2dFromProtobuf } from "~/spatial/types.js";
+import { VONNode } from "./node.js";
+import { VONNeighbor, deduplicateNeighbors, excludeNeighbors, identityToVONNeighbor, vonNeighborToIdentity } from "./neighbor.js";
 import EventEmitter from "node:events";
 
 export type MessageTypes = NonNullable<VONPacket['message']>['field']

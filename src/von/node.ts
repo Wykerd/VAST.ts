@@ -1,11 +1,12 @@
 import { DEFAULT_PORT } from "~/consts.js";
 import { Type as Addr } from "~/proto/generated/messages/vast/Addr.js";
-import { Vec2d, vec2dFromProtobuf, vec2dToProtobuf } from "~/spatial/types.js";
-import { createServer, createConnection, Server, Socket } from 'node:net';
+import { Vec2d, vec2dToProtobuf } from "~/spatial/types.js";
+import { createServer, createConnection, Server } from 'node:net';
 import { Delaunay, Voronoi } from 'd3-delaunay';
 import { VONConnection } from "./connection.js";
 import { Vector } from "~/spatial/Vector.js";
 import { Identity } from "~/proto/generated/messages/vast/index.js";
+import { VONNeighbor } from "./neighbor.js";
 
 // All VON nodes have the following three core actions available to them:
 export interface IVONNode {
@@ -16,47 +17,6 @@ export interface IVONNode {
     move(): void;
     /// Node leaves the VON network
     leave(): void;
-}
-
-export interface VONNeighbor {
-    addr: Addr;
-    position: Vec2d;
-    aoiRadius: number;
-    conn?: VONConnection;
-}
-
-export function deduplicateNeighbors(neighbors: VONNeighbor[]): VONNeighbor[] {
-    const deduped: VONNeighbor[] = [];
-
-    for (const neighbor of neighbors) {
-        if (!deduped.some(n => n.addr.hostname === neighbor.addr.hostname && n.addr.port === neighbor.addr.port))
-            deduped.push(neighbor);
-    }
-
-    return deduped;
-}
-
-export function excludeNeighbors(neighbors: VONNeighbor[], exclude: Addr[]): VONNeighbor[] {
-    return neighbors.filter(n => !exclude.some(e => e.hostname === n.addr.hostname && e.port === n.addr.port));
-}
-
-export function identityToVONNeighbor(identity: Identity): VONNeighbor {
-    if (!identity.addr || !identity.pos || !identity.aoiRadius)
-        throw new Error(`Invalid identity: ${JSON.stringify(identity)}`);
-
-    return {
-        addr: identity.addr,
-        position: vec2dFromProtobuf(identity.pos),
-        aoiRadius: identity.aoiRadius
-    }
-}
-
-export function vonNeighborToIdentity(neighbor: VONNeighbor): Identity {
-    return {
-        addr: neighbor.addr,
-        pos: vec2dToProtobuf(neighbor.position),
-        aoiRadius: neighbor.aoiRadius
-    }
 }
 
 export class VONNode implements IVONNode {
