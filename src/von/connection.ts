@@ -78,6 +78,7 @@ export class VONConnection extends EventEmitter {
     on(event: 'hello-response', listener: (res: HelloResponseMessage) => unknown): this;
     on(event: 'hello-reject', listener: (res: AcknowledgeMessage) => unknown): this;
     on(event: 'acknowledge', listener: (res: AcknowledgeMessage) => unknown): this;
+on(event: 'joined', listener: () => unknown): this;
     on(...args: Parameters<EventEmitter['on']>) {
         return super.on(...args);
     }
@@ -253,6 +254,9 @@ export class VONConnection extends EventEmitter {
         this.node.addMultipleNodes(newNeighborhood);
 
         this.#log(`VON: join complete`, this.node.getNeighbors().map(n => n.addr));
+
+        // notify listeners that the node has joined
+        this.emit('joined');
     }
 
     async #hello() {
@@ -417,16 +421,34 @@ export class VONConnection extends EventEmitter {
         })
     }
 
-    join() {
+    /**
+     * Send a JOIN message to the node.
+     * 
+     * This is the first step in joining the network.
+     * 
+     * @returns A promise that resolves when the node has been successfully joined.
+     */
+    async join() {
         const message = this.node.getIdentity();
         this.#log(`VON: joining network as`, message);
 
-        this.#send({
+        await this.#send({
             field: 'join',
             value: message
         });
+    
+        await new Promise<void>((resolve, reject) => {
+            this.once('joined', resolve);
+        });
+
+        this.#log(`VON: joined network`);
     }
 
+    /**
+     * Packs a message into a VON packet and serializes it to binary protocol buffer format.
+     * @param message The message to pack
+     * @returns The packed message as a buffer
+     */
     #pack(message: NonNullable<VONPacket['message']>) {
         const content: VONPacket = {
             timestamp: Date.now().toString(),
