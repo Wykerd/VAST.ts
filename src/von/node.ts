@@ -42,12 +42,20 @@ export function excludeNeighbors(neighbors: VONNeighbor[], exclude: Addr[]): VON
 
 export function identityToVONNeighbor(identity: Identity): VONNeighbor {
     if (!identity.addr || !identity.pos || !identity.aoiRadius)
-        throw new Error('Invalid identity');
+        throw new Error(`Invalid identity: ${JSON.stringify(identity)}`);
 
     return {
         addr: identity.addr,
         position: vec2dFromProtobuf(identity.pos),
         aoiRadius: identity.aoiRadius
+    }
+}
+
+export function vonNeighborToIdentity(neighbor: VONNeighbor): Identity {
+    return {
+        addr: neighbor.addr,
+        pos: vec2dToProtobuf(neighbor.position),
+        aoiRadius: neighbor.aoiRadius
     }
 }
 
@@ -353,8 +361,6 @@ export class VONNode implements IVONNode {
                 return node;
         })
 
-        this.#enclosingNeighbors = newNeighborhood;
-
         // The *acceptor node* determines the *joining node*'s *EN neighbors* from the constructed *local Voronoi diagram*.
         const newNodeExpectedNeighborIndices = Array.from(voronoi.neighbors(additionalConsiderationsOffset));
 
@@ -366,6 +372,8 @@ export class VONNode implements IVONNode {
             
             throw new Error('Invalid neighbor index');
         });
+
+        this.#enclosingNeighbors = newNeighborhood;
 
         return {
             newExpectedNeighbors: newNodeExpectedNeighbors.filter(n => n !== null) as VONNeighbor[],
