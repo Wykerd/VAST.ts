@@ -1,2 +1,59 @@
 syntax = "proto3";
 
+package vast;
+
+message Addr {
+    string hostname = 1;
+    int32 port = 2;
+}
+
+message Vec2d {
+    int32 x = 1;
+    int32 y = 2;
+}
+
+message VONPacket {
+    uint64 timestamp = 1;
+    uint64 sequence = 2;
+    oneof message {
+        Identity join = 3;
+        AcknowledgeMessage acknowledge = 4;
+        InvalidMessage invalid = 5;
+        Identity join_query = 6;
+        WelcomeMessage welcome = 7;
+        HelloMessage hello = 8;
+        HelloResponseMessage hello_response = 9;
+        AcknowledgeMessage hello_reject = 10;
+    }
+}
+
+message Identity {
+    Addr addr = 1;
+    Vec2d pos = 2;
+    uint32 aoi_radius = 3;
+}
+
+message AcknowledgeMessage {
+    uint64 sequence = 1;
+}
+
+message InvalidMessage {
+    uint64 sequence = 1;
+    string reason = 2;
+}
+
+message WelcomeMessage {
+    Identity identity = 1;
+    repeated Identity neighbors = 2; 
+}
+
+message HelloMessage {
+    Identity identity = 1;
+    repeated Addr neighbors = 2;
+}
+
+message HelloResponseMessage {
+    uint64 sequence = 1;
+    Identity identity = 2;
+    repeated Identity missing_neighbors = 3;
+}

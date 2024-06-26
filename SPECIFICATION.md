@@ -17,12 +17,14 @@ The following is the procedure for a node to join the network:
 
 1. The *joining node* opens a connection the the *gateway node*. The *gateway node* is any node that is known to be in the network.
 2. The *joining node* sends a *JOIN message* to the *gateway node*.
-3. The *gateway node* assigns a unique ID to the *joining node*.
-4. The *gateway node* acknowledges the *joining node*'s request by sending a *JOIN RESPONSE message* to the *joining node*.
+3. ~~The *gateway node* assigns a unique ID to the *joining node*.~~ 
+    - Removed - identified by the connection info.
+4. The *gateway node* acknowledges the *joining node*'s request by sending a *ACKNOWLEDGE message* to the *joining node*.
 5. The *gateway node* uses the *point forwarding algorithm* to send a *JOIN QUERY message* to the node whose region contains the *joining node*'s requested position. This node is the *acceptor node*.
 6. The *acceptor node* runs the *add node algorithm*.
 7. The *acceptor node* determines the *joining node*'s *EN neighbors* from the constructed *local Voronoi diagram*.
 8. The *acceptor node* sends a *WELCOME message* to the *joining node* containing the estimated list of the *joining node*'s *EN neighbors* from the constructed *local Voronoi diagram*.
+9. The *joining node* acknowledges the *WELCOME message* by sending a *ACKNOWLEDGE message* to the *acceptor node*.
 9. The *joining node* creates an set of *EN nodes* from the list of neighboring nodes in the *WELCOME message*.
 10. Using the *EN node set*, the *joining node* creates a *local Voronoi diagram*.
 10. The *joining node* enters a loop:
@@ -43,6 +45,12 @@ The *HELLO procedure* is used by a node to establish a connection with its *EN n
 6. The *node* determines its estimate of the *joining node*'s *EN neighbors* from the constructed *local Voronoi diagram*.
 7. The *node* sends a *HELLO RESPONSE message* to the *joining node* containing the *missing EN neighbors* of the *joining node*.
 8. The *node* closes any connections to the *EN nodes* in the set that are not its *EN neighbors*.
+
+## MOVE
+
+The following is the procedure for a *node* to move in the network:
+
+1. 
 
 # VON Algorithms
 
@@ -73,6 +81,7 @@ The VON specification does not mandate a specific message format. It does howeve
 All messages have the following fields regardless of the message type:
 - `type`: This is used to identify the type of the message. This is an enum field that can take any of the message types defined in the VON specification.
 - `timestamp`: The time at which the message was created. This is a 64-bit integer that represents the number of milliseconds since the Unix epoch.
+- `sequence`: The sequence number of the message. This is a 64-bit integer that is used to order messages in the case of out-of-order delivery.
 
 ## JOIN Message
 
@@ -86,18 +95,28 @@ The JOIN message is sent by a node to the gateway server when it wants to join t
 
 The JOIN QUERY message is used to find the node whose region contains the requested position of the *joining node*. The message contains the following fields:
 
-- `connection_info`: This field is required and contains the connection information of the node required to reach it on the physical network. This can be an IP address and port number, for example.
+- `connection_info`: This field is required and contains the connection information of the *joining node* required to reach it on the physical network. This can be an IP address and port number, for example.
 - `position`: This field represents the requested position of the joining node in the virtual environment. It is a 2D vector that represents the x and y coordinates of the node.
 - `aoi_radius`: This field represents the Area of Interest (AOI) radius of the joining node. It is a 64-bit floating point number that represents the radius of the circle around the node that defines its AOI.
 
-## JOIN RESPONSE Message
+## ACKNOWLEDGE Message
 
-The JOIN RESPONSE message is sent by the *gateway server* to the *joining node* to acknowledge its request to join the network. The message contains the following fields:
+The ACKNOWLEDGE message is sent to acknowledge the receipt of a message that has no response. The message contains the following fields:
 
-- `node_id`: This field is required and contains the unique ID assigned to the joining node by the gateway server.
+- `sequence`: This field is required and contains the sequence number of the message being acknowledged.
 
 ## WELCOME Message
 
 The WELCOME message is sent by the *acceptor node* to the *joining node* to welcome it to the network. The message contains the following fields:
 
+- `connection_info`: This field is required and contains the connection information of the *acceptor node* required to reach it on the physical network. This can be an IP address and port number, for example.
+- `position`: This field represents the position of the acceptor node in the virtual environment. It is a 2D vector that represents the x and y coordinates of the node.
+- `aoi_radius`: This field represents the Area of Interest (AOI) radius of the acceptor node. It is a 64-bit floating point number that represents the radius of the circle around the node that defines its AOI.
+- `neighbors`: This field is required and contains the list of estimated neighbors of the joining node. Each neighbor is represented by a `connection_info` field.
 
+# HELLO message
+
+- `connection_info`: This field is required and contains the connection information of the *acceptor node* required to reach it on the physical network. This can be an IP address and port number, for example.
+- `position`: This field represents the position of the acceptor node in the virtual environment. It is a 2D vector that represents the x and y coordinates of the node.
+- `aoi_radius`: This field represents the Area of Interest (AOI) radius of the acceptor node. It is a 64-bit floating point number that represents the radius of the circle around the node that defines its AOI.
+- `neighbors`: This field is required and contains the list of estimated neighbors of the joining node. Each neighbor is represented by a `connection_info` field.
