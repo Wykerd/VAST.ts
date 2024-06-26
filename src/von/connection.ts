@@ -115,13 +115,22 @@ export class VONConnection extends EventEmitter {
             case 'hello':
                 this.#handleHello(packet.sequence, packet.message.value);
                 break;
+            case 'joinQuery':
+                this.#handleJoinQuery(packet.sequence, packet.message.value);
+                break;
             default:
                 this.#log(`VON: received unknown message type`, packet.message.field, packet.message.value);
                 break;
         }
     }
 
-    #indentify(addr: Addr) {
+    #identify(addr: Addr) {
+        if (this.addr) {
+            if (this.addr.hostname !== addr.hostname && this.addr.port !== addr.port)
+                throw new Error(`Connection already identified as ${this.addr.hostname}:${this.addr.port}. Cannot change to ${addr.hostname}:${addr.port}`)
+            else
+                return; // identify did not change.
+        }
         if (this.node.hasConnection(addr)) {
             // this connection is illegal. there's already a connection with this address
             // close the connection
@@ -139,7 +148,7 @@ export class VONConnection extends EventEmitter {
             return;
         }
 
-        this.#indentify(message.addr);
+        this.#identify(message.addr);
 
         // The *gateway node* acknowledges the *joining node*'s request by sending a *JOIN RESPONSE message* to the *joining node*.
         await this.#acknowledge(seq);
@@ -160,21 +169,15 @@ export class VONConnection extends EventEmitter {
         })
     }
 
-    #throwIfUnidentified() {
-        if (!this.addr) {
-            throw new Error('Connection is not identified');
-        }
-    }
-
     async #handleWelcome(seq: string, message: WelcomeMessage) {
-        this.#throwIfUnidentified();
-
         if (!message.identity || (!message.identity.addr || !message.identity.pos)) {
             // invalid message
             this.#log('VON: invalid welcome message', message);
             this.#sendInvalidResponse(seq, 'malformed fields');
             return;
         }
+
+        this.#identify(message.identity.addr);
 
         // The *joining node* acknowledges the *WELCOME message* by sending a *ACKNOWLEDGE message* to the *acceptor node*.
         await this.#acknowledge(seq);
@@ -351,6 +354,10 @@ export class VONConnection extends EventEmitter {
             return;
         }
 
+        if (!isThisConnection) {
+            this.#acknowledge(seq);
+        }
+
         const position = vec2dFromProtobuf(message.pos);
 
         const nextNode = this.node.pointForward(position);
@@ -381,7 +388,23 @@ export class VONConnection extends EventEmitter {
                     identity: this.node.getIdentity()
                 }
             });
+
+            return;
         }
+
+        // we're not the target node
+        // forward the query
+        this.#log(`VON: forwarding join query to`, nextNode.addr);
+        const conn = await this.node.getConnection(nextNode.addr);
+
+        await conn.#joinQuery(message);
+    }
+
+    #joinQuery(message: Identity) {
+        return this.#send({
+            field: 'joinQuery',
+            value: message
+        });
     }
 
     #sendInvalidResponse(sequence: string, reason: string) {
@@ -395,7 +418,7 @@ export class VONConnection extends EventEmitter {
     }
 
     join() {
-        const message: Identity = this.node.getIdentity();
+        const message = this.node.getIdentity();
         this.#log(`VON: joining network as`, message);
 
         this.#send({
