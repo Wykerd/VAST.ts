@@ -8,3 +8,4 @@ export type { Type as InvalidMessage } from "./InvalidMessage.js";
 export type { Type as WelcomeMessage } from "./WelcomeMessage.js";
 export type { Type as HelloMessage } from "./HelloMessage.js";
 export type { Type as HelloResponseMessage } from "./HelloResponseMessage.js";
+export type { Type as MoveResponseMessage } from "./MoveResponseMessage.js";

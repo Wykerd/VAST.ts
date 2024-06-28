@@ -50,7 +50,14 @@ The *HELLO procedure* is used by a node to establish a connection with its *EN n
 
 The following is the procedure for a *node* to move in the network:
 
-1. 
+1. The *moving node* creates a set of *EN nodes* from its current *EN neighbors*.
+2. The *moving node* enters a loop while it has not yet contacted all the *EN nodes* in the set:
+    1. The *moving node* notifies all the nodes in the *EN node* set that has not yet been contacted of its move using a *MOVE message*. The recipient nodes run the *move node algorithm* apon receiving the message.
+    2. The *moving node* waits for a *MOVE RESPONSE message* from each of the *EN neighbors*. This includes a list of *potential EN neighbors* of the *moving node*.
+    3. These nodes are added to the *EN node set*.
+3. The *moving node* uses all the nodes in the *EN node set* to create a *local Voronoi diagram*.
+4. The *moving node* determines its new *EN neighbors* from the constructed *local Voronoi diagram*.
+5. The *moving node* terminates connections that are now unnecessary (those that are not its *EN neighbors*).
 
 # VON Algorithms
 
@@ -61,6 +68,14 @@ The *add node algorithm* is used by a *node* to add a *joining node* to its neig
 2. The *node* creates a *local Voronoi diagram* using the *EN node set*.
 3. The *node* determines its new *EN neighbors* from the constructed *local Voronoi diagram*.
 4. The *node* updates its *EN neighbors* to the new set determined from the *local Voronoi diagram*.
+
+## Move Node Algorithm
+
+The *move node algorithm* is used by a *node* to update its neighborhood when a *moving node* moves. The algorithm is as follows:
+
+1. The *node* updates its *local Voronoi diagram* to reflect the new position of the *moving node*.
+2. The *node* determines its new *EN neighbors* from the updated *local Voronoi diagram*.
+3. The *node* determines the *predicted EN neighbors* of the *moving node* from the updated *local Voronoi diagram*.
 
 ## Point Forwarding Algorithm
 
@@ -114,9 +129,19 @@ The WELCOME message is sent by the *acceptor node* to the *joining node* to welc
 - `aoi_radius`: This field represents the Area of Interest (AOI) radius of the acceptor node. It is a 64-bit floating point number that represents the radius of the circle around the node that defines its AOI.
 - `neighbors`: This field is required and contains the list of estimated neighbors of the joining node. Each neighbor is represented by a `connection_info` field.
 
-# HELLO message
+## HELLO message
 
 - `connection_info`: This field is required and contains the connection information of the *acceptor node* required to reach it on the physical network. This can be an IP address and port number, for example.
 - `position`: This field represents the position of the acceptor node in the virtual environment. It is a 2D vector that represents the x and y coordinates of the node.
 - `aoi_radius`: This field represents the Area of Interest (AOI) radius of the acceptor node. It is a 64-bit floating point number that represents the radius of the circle around the node that defines its AOI.
 - `neighbors`: This field is required and contains the list of estimated neighbors of the joining node. Each neighbor is represented by a `connection_info` field.
+
+## MOVE message
+
+- `connection_info`: yep.
+- `position`: The position of the moving node.
+
+## MOVE RESPONSE message
+
+- `sequence`: This field is required and contains the sequence number of the message being acknowledged.
+- `neighbors`: Predicted neighbors of the moving node.

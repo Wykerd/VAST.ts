@@ -24,6 +24,8 @@ message VONPacket {
         HelloMessage hello = 8;
         HelloResponseMessage hello_response = 9;
         AcknowledgeMessage hello_reject = 10;
+        Identity move = 11;
+        MoveResponseMessage move_response = 12;
     }
 }
 
@@ -56,4 +58,9 @@ message HelloResponseMessage {
     uint64 sequence = 1;
     Identity identity = 2;
     repeated Identity missing_neighbors = 3;
+}
+
+message MoveResponseMessage {
+    uint64 sequence = 1;
+    repeated Identity neighbors = 2;
 }

@@ -10,6 +10,16 @@ export interface VONNeighbor {
 }
 
 /**
+ * Returns the index of the neighbor with the given address
+ * @param neighbors The list of neighbors to search
+ * @param addr The address to search for
+ * @returns The index of the neighbor, or -1 if not found
+ */
+export function indexOfNeighbor(neighbors: VONNeighbor[], addr: Addr): number {
+    return neighbors.findIndex(n => n.addr.hostname === addr.hostname && n.addr.port === addr.port);
+}
+
+/**
  * Removes any duplicate neighbors from the list
  * @param neighbors List of neighbors to deduplicate
  * @returns A list of unique neighbors

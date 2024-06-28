@@ -1,7 +1,7 @@
 import { Socket } from "node:net";
 import { encodeBinary as encodeVONPacket, decodeBinary as decodeVONPacket } from "~/proto/generated/messages/vast/VONPacket.js";
-import { AcknowledgeMessage, Addr, HelloMessage, HelloResponseMessage, Identity, VONPacket, WelcomeMessage } from "~/proto/generated/messages/vast/index.js";
-import { vec2dFromProtobuf } from "~/spatial/types.js";
+import { AcknowledgeMessage, Addr, HelloMessage, HelloResponseMessage, Identity, MoveResponseMessage, VONPacket, WelcomeMessage } from "~/proto/generated/messages/vast/index.js";
+import { Vec2d, vec2dFromProtobuf } from "~/spatial/types.js";
 import { VONNode } from "./node.js";
 import { VONNeighbor, deduplicateNeighbors, excludeNeighbors, identityToVONNeighbor, vonNeighborToIdentity } from "./neighbor.js";
 import EventEmitter from "node:events";
@@ -34,61 +34,62 @@ export class VONConnection extends EventEmitter {
     }
 
     #handleTCPData(data: Buffer) {
-            this.#recv_chunks.push(new Uint8Array(data.buffer));
+        this.#recv_chunks.push(new Uint8Array(data.buffer));
 
-            const chunk_total_length = this.#recv_chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
-            const joined_chunks = new Uint8Array(chunk_total_length);
-            let current_offset = 0;
-            for (const chunk of this.#recv_chunks) {
-                joined_chunks.set(chunk, current_offset);
-                current_offset += chunk.byteLength;
-            }
+        const chunk_total_length = this.#recv_chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
+        const joined_chunks = new Uint8Array(chunk_total_length);
+        let current_offset = 0;
+        for (const chunk of this.#recv_chunks) {
+            joined_chunks.set(chunk, current_offset);
+            current_offset += chunk.byteLength;
+        }
 
-            const view = new DataView(joined_chunks.buffer);
-            let viewOffset = 0;
+        const view = new DataView(joined_chunks.buffer);
+        let viewOffset = 0;
 
-            while (viewOffset < joined_chunks.byteLength) {
-                if (this.#recv_state === 'header') {
+        while (viewOffset < joined_chunks.byteLength) {
+            if (this.#recv_state === 'header') {
 
-                    if (joined_chunks.byteLength < 4) {
-                        // Not enough data to read the header
-                        break;
-                    }
-    
-                    this.#recv_message_length = view.getUint32(viewOffset);
-                    
-                    // drop the header
-                    this.#recv_chunks = [joined_chunks.slice(4)];
-    
-                    viewOffset += 4;
-                    this.#recv_state = 'message';
-    
-                    this.#log('VON: incoming message length', this.#recv_message_length);
-                }
-    
-                // read the message
-                if (joined_chunks.byteLength >= this.#recv_message_length) {
-                    // read this.#recv_message_length bytes from the buffer
-                    const message = joined_chunks.slice(viewOffset, viewOffset + this.#recv_message_length);
-                    this.#receive(message);
-                    this.#recv_state = 'header';
-                    // reset the state
-                    this.#recv_state = 'header';
-                    // move the view offset
-                    viewOffset += this.#recv_message_length;
-                } else {
-                    // not enough data to read the message
+                if (joined_chunks.byteLength < 4) {
+                    // Not enough data to read the header
                     break;
                 }
+
+                this.#recv_message_length = view.getUint32(viewOffset);
+                
+                // drop the header
+                this.#recv_chunks = [joined_chunks.slice(4)];
+
+                viewOffset += 4;
+                this.#recv_state = 'message';
+
+                this.#log('VON: incoming message length', this.#recv_message_length);
             }
 
-            this.#recv_chunks = [joined_chunks.slice(viewOffset)];
+            // read the message
+            if (joined_chunks.byteLength >= this.#recv_message_length) {
+                // read this.#recv_message_length bytes from the buffer
+                const message = joined_chunks.slice(viewOffset, viewOffset + this.#recv_message_length);
+                this.#receive(message);
+                this.#recv_state = 'header';
+                // reset the state
+                this.#recv_state = 'header';
+                // move the view offset
+                viewOffset += this.#recv_message_length;
+            } else {
+                // not enough data to read the message
+                break;
             }
+        }
+
+        this.#recv_chunks = [joined_chunks.slice(viewOffset)];
+    }
 
     on(event: 'hello-response', listener: (res: HelloResponseMessage) => unknown): this;
     on(event: 'hello-reject', listener: (res: AcknowledgeMessage) => unknown): this;
     on(event: 'acknowledge', listener: (res: AcknowledgeMessage) => unknown): this;
-on(event: 'joined', listener: () => unknown): this;
+    on(event: 'joined', listener: () => unknown): this;
+    on(event: 'move-response', listener: (res: MoveResponseMessage) => unknown): this;
     on(...args: Parameters<EventEmitter['on']>) {
         return super.on(...args);
     }
@@ -128,6 +129,12 @@ on(event: 'joined', listener: () => unknown): this;
                 break;
             case 'joinQuery':
                 this.#handleJoinQuery(packet.sequence, packet.message.value);
+                break;
+            case 'moveResponse':
+                this.emit('move-response', packet.message.value);
+                break;
+            case 'move':
+                this.#handleMove(packet.sequence, packet.message.value);
                 break;
             default:
                 this.#log(`VON: received unknown message type`, packet.message.field, packet.message.value);
@@ -169,6 +176,28 @@ on(event: 'joined', listener: () => unknown): this;
         // we first send the query to ourselves
         // from there the query will be forwarded to the correct node
         await this.#handleJoinQuery(seq, message, true);
+    }
+
+    async #handleMove(seq: string, message: Identity) {
+        if (!message.addr || !message.pos) {
+            // invalid message
+            this.#log('VON: invalid move message', message);
+            this.#sendInvalidResponse(seq, 'malformed fields');
+            return;
+        }
+
+        this.#identify(message.addr);
+
+        // The recipient nodes run the *move node algorithm* apon receiving the message.
+        const potentialNeighbors = this.node.moveNeighbor(identityToVONNeighbor(message));
+
+        this.#send({
+            field: 'moveResponse',
+            value: {
+                sequence: seq,
+                neighbors: potentialNeighbors.map(n => vonNeighborToIdentity(n))
+            }
+        })
     }
 
     #acknowledge(seq: string) {
@@ -446,12 +475,33 @@ on(event: 'joined', listener: () => unknown): this;
             field: 'join',
             value: message
         });
-    
+
         await new Promise<void>((resolve, reject) => {
             this.once('joined', resolve);
         });
 
         this.#log(`VON: joined network`);
+    }
+
+    /**
+     * Notify the connected node that the node has moved. To be called after the node has updated its position.
+     * @returns The response message from the node
+     */
+    async move() {
+        const message = this.node.getIdentity();
+
+        const seq = await this.#send({
+            field: 'move',
+            value: message
+        });
+
+        return new Promise<MoveResponseMessage>((resolve, reject) => {
+            this.once('move-response', (res: MoveResponseMessage) => {
+                if (res.sequence === seq) {
+                    resolve(res);
+                }
+            });
+        });
     }
 
     /**
@@ -483,6 +533,11 @@ on(event: 'joined', listener: () => unknown): this;
         };
     }
 
+    /**
+     * Packs and sends a message over the connection.
+     * @param message The message to send
+     * @returns A promise that resolves when the message has been sent. The promise resolves with the sequence number of the message.
+     */
     #send(message: NonNullable<VONPacket['message']>) {
         const {
             packet,

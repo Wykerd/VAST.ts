@@ -42,6 +42,13 @@ import {
   decodeBinary as decodeBinary_6,
 } from "./HelloResponseMessage.js";
 import {
+  Type as MoveResponseMessage,
+  encodeJson as encodeJson_7,
+  decodeJson as decodeJson_7,
+  encodeBinary as encodeBinary_7,
+  decodeBinary as decodeBinary_7,
+} from "./MoveResponseMessage.js";
+import {
   tsValueToJsonValueFns,
   jsonValueToTsValueFns,
 } from "../../runtime/json/scalar.js";
@@ -74,6 +81,8 @@ export declare namespace $.vast {
       | { field: "hello", value: HelloMessage }
       | { field: "helloResponse", value: HelloResponseMessage }
       | { field: "helloReject", value: AcknowledgeMessage }
+      | { field: "move", value: Identity }
+      | { field: "moveResponse", value: MoveResponseMessage }
   );
   }
 }
@@ -132,6 +141,14 @@ export function encodeJson(value: $.vast.VONPacket): unknown {
       result.helloReject = encodeJson_2(value.message.value);
       break;
     }
+    case "move": {
+      result.move = encodeJson_1(value.message.value);
+      break;
+    }
+    case "moveResponse": {
+      result.moveResponse = encodeJson_7(value.message.value);
+      break;
+    }
   }
   return result;
 }
@@ -148,6 +165,8 @@ export function decodeJson(value: any): $.vast.VONPacket {
   if (value.hello !== undefined) result.message = {field: "hello", value: decodeJson_5(value.hello)};
   if (value.helloResponse !== undefined) result.message = {field: "helloResponse", value: decodeJson_6(value.helloResponse)};
   if (value.helloReject !== undefined) result.message = {field: "helloReject", value: decodeJson_2(value.helloReject)};
+  if (value.move !== undefined) result.message = {field: "move", value: decodeJson_1(value.move)};
+  if (value.moveResponse !== undefined) result.message = {field: "moveResponse", value: decodeJson_7(value.moveResponse)};
   return result;
 }
 
@@ -222,12 +241,26 @@ export function encodeBinary(value: $.vast.VONPacket): Uint8Array {
       );
       break;
     }
+    case "move": {
+      const tsValue = value.message.value;
+      result.push(
+        [11, { type: WireType.LengthDelimited as const, value: encodeBinary_1(tsValue) }],
+      );
+      break;
+    }
+    case "moveResponse": {
+      const tsValue = value.message.value;
+      result.push(
+        [12, { type: WireType.LengthDelimited as const, value: encodeBinary_7(tsValue) }],
+      );
+      break;
+    }
   }
   return serialize(result);
 }
 
 const oneofFieldNumbersMap: { [oneof: string]: Set<number> } = {
-  message: new Set([3, 4, 5, 6, 7, 8, 9, 10]),
+  message: new Set([3, 4, 5, 6, 7, 8, 9, 10, 11, 12]),
 };
 
 const oneofFieldNamesMap = {
@@ -240,6 +273,8 @@ const oneofFieldNamesMap = {
     [8, "hello" as const],
     [9, "helloResponse" as const],
     [10, "helloReject" as const],
+    [11, "move" as const],
+    [12, "moveResponse" as const],
   ]),
 };
 
@@ -277,6 +312,8 @@ export function decodeBinary(binary: Uint8Array): $.vast.VONPacket {
       [8](wireValue: Field) { return wireValue.type === WireType.LengthDelimited ? decodeBinary_5(wireValue.value) : undefined; },
       [9](wireValue: Field) { return wireValue.type === WireType.LengthDelimited ? decodeBinary_6(wireValue.value) : undefined; },
       [10](wireValue: Field) { return wireValue.type === WireType.LengthDelimited ? decodeBinary_2(wireValue.value) : undefined; },
+      [11](wireValue: Field) { return wireValue.type === WireType.LengthDelimited ? decodeBinary_1(wireValue.value) : undefined; },
+      [12](wireValue: Field) { return wireValue.type === WireType.LengthDelimited ? decodeBinary_7(wireValue.value) : undefined; },
     };
     const value = (wireValueToTsValueMap[fieldNumber as keyof typeof wireValueToTsValueMap] as any)?.(wireValue!);
     if (value === undefined) break oneof;

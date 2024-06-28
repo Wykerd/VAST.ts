@@ -6,7 +6,7 @@ import { Delaunay, Voronoi } from 'd3-delaunay';
 import { VONConnection } from "./connection.js";
 import { Vector } from "~/spatial/Vector.js";
 import { Identity } from "~/proto/generated/messages/vast/index.js";
-import { VONNeighbor } from "./neighbor.js";
+import { VONNeighbor, identityToVONNeighbor, indexOfNeighbor } from "./neighbor.js";
 
 // All VON nodes have the following three core actions available to them:
 export interface IVONNode {
@@ -14,7 +14,7 @@ export interface IVONNode {
     join(url: string, position: Vec2d, aoiRadius: number): Promise<void>;
     join(hostname: string, port: number, position: Vec2d, aoiRadius: number): Promise<void>;
     /// Change position of the node in the virtual environment
-    move(): void;
+    move(position: Vec2d): void;
     /// Node leaves the VON network
     leave(): void;
 }
@@ -251,6 +251,11 @@ export class VONNode implements IVONNode {
         };
     }
 
+    /**
+     * Checks if the current node contain the given point in its region.
+     * @param point The point to check
+     * @returns `true` if the current node contains the point, otherwise `false`.
+     */
     containsPoint(point: Vec2d) {
         // zero index is the current node
         // so we see if index 0 contains the point (this node contains the point)
@@ -341,10 +346,17 @@ export class VONNode implements IVONNode {
         }
     }
 
+    /**
+     * Get a list of enclosing neighbors (ENs)
+     * @returns A list of enclosing neighbors
+     */
     getNeighbors(): VONNeighbor[] {
         return [...this.#enclosingNeighbors];
     }
 
+    /**
+     * Clears the list of neighbors. Don't use this unless you know what you're doing (for internal use)
+     */
     clearNeighbors() {
         this.#enclosingNeighbors = [];
     }
@@ -371,8 +383,66 @@ export class VONNode implements IVONNode {
         this.#enclosingNeighbors = newNeighborhood;
     }
 
-    move(): void {
-        throw new Error('Method not implemented.');
+
+    moveNeighbor(neighbor: VONNeighbor): VONNeighbor[] {
+        // The *node* updates its *local Voronoi diagram* to reflect the new position of the *moving node*.
+        // we need to determine if the node is already present in the list of neighbors
+        const neighborIndex = indexOfNeighbor(this.#enclosingNeighbors, neighbor.addr);
+
+        // if the node is already in the EN list, we need to remove it.
+        if (neighborIndex !== -1) {
+            this.#enclosingNeighbors.splice(neighborIndex, 1);
+        }
+
+        // now we reinsert the node into the EN list
+        return this.addNode(neighbor).newExpectedNeighbors;
+    }
+
+    /**
+     * Move the node to a new position in the VON.
+     * @param position New position of the node in the virtual environment.
+     */
+    async move(position: Vec2d): Promise<void> {
+        // TODO: parallelize this
+
+        // The *moving node* creates a set of *EN nodes* from its current *EN neighbors*.
+        const neighbors = this.getNeighbors(); // this creates a copy of the array so we can play around with it.
+        const unseen_neighbors: Addr[] = neighbors.map(n => n.addr);
+        const neighbor_id_set = new Set(neighbors.map(n => `${n.addr.hostname}:${n.addr.port}`));
+
+        this.#position = position;
+
+        // The *moving node* enters a loop while it has not yet contacted all the *EN nodes* in the set:
+        while (unseen_neighbors.length > 0) {
+            const considering = unseen_neighbors.pop()!;
+            const conn = await this.getConnection(considering);
+            // The *moving node* notifies all the nodes in the *EN node* set that has not yet been contacted of its move using a *MOVE message*. The recipient nodes run the *move node algorithm* apon receiving the message.
+            // The *moving node* waits for a *MOVE RESPONSE message* from each of the *EN neighbors*. This includes a list of *potential EN neighbors* of the *moving node*.
+            const res = await conn.move();
+            const new_neighbors: Identity[] = [];
+            for (const neighbor of res.neighbors) {
+                if (!neighbor.addr || !neighbor.pos || !neighbor.aoiRadius)
+                    continue; // XXX: maybe handle this with an invalid response error?
+
+                const neighbor_id = `${neighbor.addr.hostname}:${neighbor.addr.port}`;
+                // we don't want to add duplicates
+                if (neighbor_id_set.has(neighbor_id)) continue;
+                neighbor_id_set.add(neighbor_id);
+                // this node is indeed unseen
+                new_neighbors.push(neighbor);
+            }
+
+            // right, we've got new neighbors. Let's add them to the list of neighbors
+            const von_neighbors = new_neighbors.map(identity => identityToVONNeighbor(identity));
+            // These nodes are added to the *EN node set*.
+            neighbors.push(...von_neighbors);
+            unseen_neighbors.push(...von_neighbors.map(n => n.addr));
+        }
+
+        // The *moving node* uses all the nodes in the *EN node set* to create a *local Voronoi diagram*.
+        this.clearNeighbors();
+        // this takes care of updating the voronoi and also updating the EN list.
+        this.addMultipleNodes(neighbors);        
     }
 
     leave(): void {
