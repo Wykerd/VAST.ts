@@ -217,11 +217,11 @@ export class VONNode extends EventEmitter implements IVONNode {
 
         this.#log(`VON: connected to`, addr);
 
-        const von_conn = new VONConnection(conn, this, addr);
+        const vonConn = new VONConnection(conn, this, addr);
 
-        this.#connections.push(von_conn);
+        this.#connections.push(vonConn);
         
-        return von_conn;
+        return vonConn;
     }
 
     #computeVoronoi(additionalConsiderations: Vec2d[] = []) {
@@ -414,36 +414,36 @@ export class VONNode extends EventEmitter implements IVONNode {
 
         // The *moving node* creates a set of *EN nodes* from its current *EN neighbors*.
         const neighbors = this.getNeighbors(); // this creates a copy of the array so we can play around with it.
-        const unseen_neighbors: Addr[] = neighbors.map(n => n.addr);
-        const neighbor_id_set = new Set(neighbors.map(n => `${n.addr.hostname}:${n.addr.port}`));
+        const unseenNeighbors: Addr[] = neighbors.map(n => n.addr);
+        const neighborIdSet = new Set(neighbors.map(n => `${n.addr.hostname}:${n.addr.port}`));
 
         this.#position = position;
 
         // The *moving node* enters a loop while it has not yet contacted all the *EN nodes* in the set:
-        while (unseen_neighbors.length > 0) {
-            const considering = unseen_neighbors.pop()!;
+        while (unseenNeighbors.length > 0) {
+            const considering = unseenNeighbors.pop()!;
             const conn = await this.getConnection(considering);
             // The *moving node* notifies all the nodes in the *EN node* set that has not yet been contacted of its move using a *MOVE message*. The recipient nodes run the *move node algorithm* apon receiving the message.
             // The *moving node* waits for a *MOVE RESPONSE message* from each of the *EN neighbors*. This includes a list of *potential EN neighbors* of the *moving node*.
             const res = await conn.move();
-            const new_neighbors: Identity[] = [];
+            const newNeighbors: Identity[] = [];
             for (const neighbor of res.neighbors) {
                 if (!neighbor.addr || !neighbor.pos || !neighbor.aoiRadius)
                     continue; // XXX: maybe handle this with an invalid response error?
 
-                const neighbor_id = `${neighbor.addr.hostname}:${neighbor.addr.port}`;
+                const neighborId = `${neighbor.addr.hostname}:${neighbor.addr.port}`;
                 // we don't want to add duplicates
-                if (neighbor_id_set.has(neighbor_id)) continue;
-                neighbor_id_set.add(neighbor_id);
+                if (neighborIdSet.has(neighborId)) continue;
+                neighborIdSet.add(neighborId);
                 // this node is indeed unseen
-                new_neighbors.push(neighbor);
+                newNeighbors.push(neighbor);
             }
 
             // right, we've got new neighbors. Let's add them to the list of neighbors
-            const von_neighbors = new_neighbors.map(identity => identityToVONNeighbor(identity));
+            const vonNeighbors = newNeighbors.map(identity => identityToVONNeighbor(identity));
             // These nodes are added to the *EN node set*.
-            neighbors.push(...von_neighbors);
-            unseen_neighbors.push(...von_neighbors.map(n => n.addr));
+            neighbors.push(...vonNeighbors);
+            unseenNeighbors.push(...vonNeighbors.map(n => n.addr));
         }
 
         // The *moving node* uses all the nodes in the *EN node set* to create a *local Voronoi diagram*.

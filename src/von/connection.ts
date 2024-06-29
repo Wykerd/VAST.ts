@@ -1,7 +1,7 @@
 import { Socket } from "node:net";
 import { encodeBinary as encodeVONPacket, decodeBinary as decodeVONPacket } from "~/proto/generated/messages/vast/VONPacket.js";
 import { AcknowledgeMessage, Addr, HelloMessage, HelloResponseMessage, Identity, MoveResponseMessage, VONPacket, WelcomeMessage } from "~/proto/generated/messages/vast/index.js";
-import { Vec2d, vec2dFromProtobuf } from "~/spatial/types.js";
+import { vec2dFromProtobuf } from "~/spatial/types.js";
 import { VONNode } from "./node.js";
 import { VONNeighbor, deduplicateNeighbors, excludeNeighbors, identityToVONNeighbor, vonNeighborToIdentity } from "./neighbor.js";
 import EventEmitter from "node:events";
@@ -12,9 +12,9 @@ export class VONConnection extends EventEmitter {
     #conn: Socket;
 
     // Receive state machine
-    #recv_state: 'header' | 'message' = 'header';
-    #recv_chunks: Uint8Array[] = [];
-    #recv_message_length: number = 0;
+    #recvState: 'header' | 'message' = 'header';
+    #recvChunks: Uint8Array[] = [];
+    #recvMessageLength: number = 0;
     
     // sequence number for messages
     #sequence: bigint = BigInt(0);
@@ -34,55 +34,55 @@ export class VONConnection extends EventEmitter {
     }
 
     #handleTCPData(data: Buffer) {
-        this.#recv_chunks.push(new Uint8Array(data.buffer));
+        this.#recvChunks.push(new Uint8Array(data.buffer));
 
-        const chunk_total_length = this.#recv_chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
-        const joined_chunks = new Uint8Array(chunk_total_length);
-        let current_offset = 0;
-        for (const chunk of this.#recv_chunks) {
-            joined_chunks.set(chunk, current_offset);
-            current_offset += chunk.byteLength;
+        const chunkTotalLength = this.#recvChunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
+        const joinedChunks = new Uint8Array(chunkTotalLength);
+        let currentOffset = 0;
+        for (const chunk of this.#recvChunks) {
+            joinedChunks.set(chunk, currentOffset);
+            currentOffset += chunk.byteLength;
         }
 
-        const view = new DataView(joined_chunks.buffer);
+        const view = new DataView(joinedChunks.buffer);
         let viewOffset = 0;
 
-        while (viewOffset < joined_chunks.byteLength) {
-            if (this.#recv_state === 'header') {
+        while (viewOffset < joinedChunks.byteLength) {
+            if (this.#recvState === 'header') {
 
-                if (joined_chunks.byteLength < 4) {
+                if (joinedChunks.byteLength < 4) {
                     // Not enough data to read the header
                     break;
                 }
 
-                this.#recv_message_length = view.getUint32(viewOffset);
+                this.#recvMessageLength = view.getUint32(viewOffset);
                 
                 // drop the header
-                this.#recv_chunks = [joined_chunks.slice(4)];
+                this.#recvChunks = [joinedChunks.slice(4)];
 
                 viewOffset += 4;
-                this.#recv_state = 'message';
+                this.#recvState = 'message';
 
-                this.#log('VON: incoming message length', this.#recv_message_length);
+                this.#log('VON: incoming message length', this.#recvMessageLength);
             }
 
             // read the message
-            if (joined_chunks.byteLength >= this.#recv_message_length) {
+            if (joinedChunks.byteLength >= this.#recvMessageLength) {
                 // read this.#recv_message_length bytes from the buffer
-                const message = joined_chunks.slice(viewOffset, viewOffset + this.#recv_message_length);
+                const message = joinedChunks.slice(viewOffset, viewOffset + this.#recvMessageLength);
                 this.#receive(message);
-                this.#recv_state = 'header';
+                this.#recvState = 'header';
                 // reset the state
-                this.#recv_state = 'header';
+                this.#recvState = 'header';
                 // move the view offset
-                viewOffset += this.#recv_message_length;
+                viewOffset += this.#recvMessageLength;
             } else {
                 // not enough data to read the message
                 break;
             }
         }
 
-        this.#recv_chunks = [joined_chunks.slice(viewOffset)];
+        this.#recvChunks = [joinedChunks.slice(viewOffset)];
     }
 
     on(event: 'hello-response', listener: (res: HelloResponseMessage) => unknown): this;
