@@ -42,15 +42,15 @@ export function createValue(partialValue: Partial<$.vast.Vec2d>): $.vast.Vec2d {
 
 export function encodeJson(value: $.vast.Vec2d): unknown {
   const result: any = {};
-  if (value.x !== undefined) result.x = tsValueToJsonValueFns.int32(value.x);
-  if (value.y !== undefined) result.y = tsValueToJsonValueFns.int32(value.y);
+  if (value.x !== undefined) result.x = tsValueToJsonValueFns.double(value.x);
+  if (value.y !== undefined) result.y = tsValueToJsonValueFns.double(value.y);
   return result;
 }
 
 export function decodeJson(value: any): $.vast.Vec2d {
   const result = getDefaultValue();
-  if (value.x !== undefined) result.x = jsonValueToTsValueFns.int32(value.x);
-  if (value.y !== undefined) result.y = jsonValueToTsValueFns.int32(value.y);
+  if (value.x !== undefined) result.x = jsonValueToTsValueFns.double(value.x);
+  if (value.y !== undefined) result.y = jsonValueToTsValueFns.double(value.y);
   return result;
 }
 
@@ -59,13 +59,13 @@ export function encodeBinary(value: $.vast.Vec2d): Uint8Array {
   if (value.x !== undefined) {
     const tsValue = value.x;
     result.push(
-      [1, tsValueToWireValueFns.int32(tsValue)],
+      [1, tsValueToWireValueFns.double(tsValue)],
     );
   }
   if (value.y !== undefined) {
     const tsValue = value.y;
     result.push(
-      [2, tsValueToWireValueFns.int32(tsValue)],
+      [2, tsValueToWireValueFns.double(tsValue)],
     );
   }
   return serialize(result);
@@ -78,14 +78,14 @@ export function decodeBinary(binary: Uint8Array): $.vast.Vec2d {
   field: {
     const wireValue = wireFields.get(1);
     if (wireValue === undefined) break field;
-    const value = wireValueToTsValueFns.int32(wireValue);
+    const value = wireValueToTsValueFns.double(wireValue);
     if (value === undefined) break field;
     result.x = value;
   }
   field: {
     const wireValue = wireFields.get(2);
     if (wireValue === undefined) break field;
-    const value = wireValueToTsValueFns.int32(wireValue);
+    const value = wireValueToTsValueFns.double(wireValue);
     if (value === undefined) break field;
     result.y = value;
   }
