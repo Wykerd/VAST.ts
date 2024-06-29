@@ -88,7 +88,6 @@ export class VONConnection extends EventEmitter {
     on(event: 'hello-response', listener: (res: HelloResponseMessage) => unknown): this;
     on(event: 'hello-reject', listener: (res: AcknowledgeMessage) => unknown): this;
     on(event: 'acknowledge', listener: (res: AcknowledgeMessage) => unknown): this;
-    on(event: 'joined', listener: () => unknown): this;
     on(event: 'move-response', listener: (res: MoveResponseMessage) => unknown): this;
     on(...args: Parameters<EventEmitter['on']>) {
         return super.on(...args);
@@ -295,7 +294,7 @@ export class VONConnection extends EventEmitter {
         this.#log(`VON: join complete`, this.node.getNeighbors().map(n => n.addr));
 
         // notify listeners that the node has joined
-        this.emit('joined');
+        this.node.emit('joined');
     }
 
     async #hello() {
@@ -477,7 +476,7 @@ export class VONConnection extends EventEmitter {
         });
 
         await new Promise<void>((resolve, reject) => {
-            this.once('joined', resolve);
+            this.node.once('joined', resolve);
         });
 
         this.#log(`VON: joined network`);
@@ -498,6 +497,7 @@ export class VONConnection extends EventEmitter {
         return new Promise<MoveResponseMessage>((resolve, reject) => {
             this.once('move-response', (res: MoveResponseMessage) => {
                 if (res.sequence === seq) {
+                    this.#log(`move-response(sequence=${seq})`, res);
                     resolve(res);
                 }
             });

@@ -7,6 +7,7 @@ import { VONConnection } from "./connection.js";
 import { Vector } from "~/spatial/Vector.js";
 import { Identity } from "~/proto/generated/messages/vast/index.js";
 import { VONNeighbor, identityToVONNeighbor, indexOfNeighbor } from "./neighbor.js";
+import EventEmitter from "node:events";
 
 // All VON nodes have the following three core actions available to them:
 export interface IVONNode {
@@ -19,7 +20,7 @@ export interface IVONNode {
     leave(): void;
 }
 
-export class VONNode implements IVONNode {
+export class VONNode extends EventEmitter implements IVONNode {
     #server: Server;
     #voronoi: Voronoi<Delaunay.Point>;
     #position: Vec2d = [0, 0];
@@ -30,6 +31,7 @@ export class VONNode implements IVONNode {
     readonly id: string;
 
     private constructor(addr: Addr, server: Server) { 
+        super();
         this.#log(`VON: created tcp server on`, server.address());
 
         this.#server = server;
@@ -49,6 +51,11 @@ export class VONNode implements IVONNode {
 
             this.#connections.push(conn);
         })
+    }
+
+    on(event: 'joined', listener: () => unknown): this;
+    on(...args: Parameters<EventEmitter['on']>) {
+        return super.on(...args);
     }
 
     /**
@@ -164,7 +171,7 @@ export class VONNode implements IVONNode {
 
         // Connect to the gateway
         const conn = await this.getConnection(gwConnInfo);
-        conn.join();
+        return conn.join();
     }
 
     async getConnection(addr: Addr) {
@@ -442,7 +449,7 @@ export class VONNode implements IVONNode {
         // The *moving node* uses all the nodes in the *EN node set* to create a *local Voronoi diagram*.
         this.clearNeighbors();
         // this takes care of updating the voronoi and also updating the EN list.
-        this.addMultipleNodes(neighbors);        
+        this.addMultipleNodes(neighbors);
     }
 
     leave(): void {
