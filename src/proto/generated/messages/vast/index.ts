@@ -9,3 +9,6 @@ export type { Type as WelcomeMessage } from "./WelcomeMessage.js";
 export type { Type as HelloMessage } from "./HelloMessage.js";
 export type { Type as HelloResponseMessage } from "./HelloResponseMessage.js";
 export type { Type as MoveResponseMessage } from "./MoveResponseMessage.js";
+export type { Type as LeaveMessage } from "./LeaveMessage.js";
+export type { Type as LeaveNotifyMessage } from "./LeaveNotifyMessage.js";
+export type { Type as LeaveRecoverMessage } from "./LeaveRecoverMessage.js";

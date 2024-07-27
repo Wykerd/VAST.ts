@@ -26,6 +26,9 @@ message VONPacket {
         AcknowledgeMessage hello_reject = 10;
         Identity move = 11;
         MoveResponseMessage move_response = 12;
+        LeaveMessage leave = 13;
+        LeaveNotifyMessage leave_notify = 14;
+        LeaveRecoverMessage leave_recover = 15;
     }
 }
 
@@ -63,4 +66,19 @@ message HelloResponseMessage {
 message MoveResponseMessage {
     uint64 sequence = 1;
     repeated Identity neighbors = 2;
+}
+
+message LeaveMessage {
+    Identity identity = 1;
+    repeated Identity neighbors = 2;
+}
+
+message LeaveNotifyMessage {
+    Identity identity = 1;
+    Identity leaving_node = 2;
+}
+
+message LeaveRecoverMessage {
+    uint64 sequence = 1;
+    repeated Identity potential_neighbors = 2;
 }

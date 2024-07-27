@@ -1,6 +1,6 @@
 import { Socket } from "node:net";
 import { encodeBinary as encodeVONPacket, decodeBinary as decodeVONPacket } from "~/proto/generated/messages/vast/VONPacket.js";
-import { AcknowledgeMessage, Addr, HelloMessage, HelloResponseMessage, Identity, MoveResponseMessage, VONPacket, WelcomeMessage } from "~/proto/generated/messages/vast/index.js";
+import { AcknowledgeMessage, Addr, HelloMessage, HelloResponseMessage, Identity, LeaveMessage, LeaveNotifyMessage, LeaveRecoverMessage, MoveResponseMessage, VONPacket, WelcomeMessage } from "~/proto/generated/messages/vast/index.js";
 import { vec2dFromProtobuf } from "~/spatial/types.js";
 import { VONNode } from "./node.js";
 import { VONNeighbor, deduplicateNeighbors, excludeNeighbors, identityToVONNeighbor, vonNeighborToIdentity } from "./neighbor.js";
@@ -89,6 +89,7 @@ export class VONConnection extends EventEmitter {
     on(event: 'hello-reject', listener: (res: AcknowledgeMessage) => unknown): this;
     on(event: 'acknowledge', listener: (res: AcknowledgeMessage) => unknown): this;
     on(event: 'move-response', listener: (res: MoveResponseMessage) => unknown): this;
+    on(event: 'leave-recover', listener: (res: LeaveRecoverMessage) => unknown): this;
     on(...args: Parameters<EventEmitter['on']>) {
         return super.on(...args);
     }
@@ -135,6 +136,15 @@ export class VONConnection extends EventEmitter {
             case 'move':
                 this.#handleMove(packet.sequence, packet.message.value);
                 break;
+            case 'leave':
+                this.#handleLeave(packet.sequence, packet.message.value);
+                break;
+            case 'leaveNotify':
+                this.#handleLeaveNotify(packet.sequence, packet.message.value);
+                break;
+            case 'leaveRecover':
+                this.emit('leave-recover', packet.message.value);
+                break;
             default:
                 this.#log(`VON: received unknown message type`, packet.message.field, packet.message.value);
                 break;
@@ -154,6 +164,48 @@ export class VONConnection extends EventEmitter {
             throw new Error('Connection already exists. Unimplemented behavior.')
         }
         this.addr = addr;
+    }
+
+    async #handleLeave(seq: string, message: LeaveMessage) {
+        if (!message.identity || !message.identity.addr || !message.identity.pos) {
+            // invalid message
+            this.#log('VON: invalid leave message', message);
+            this.#sendInvalidResponse(seq, 'malformed fields');
+            return;
+        }
+        await this.node.removeNode(identityToVONNeighbor(message.identity), message.neighbors.map(n => identityToVONNeighbor(n)));
+    }
+
+    async #handleLeaveNotify(seq: string, message: LeaveNotifyMessage) {
+        if (!message.leavingNode || !message.leavingNode.addr || !message.leavingNode.pos) {
+            // invalid message
+            this.#log('VON: invalid leave notify message', message);
+            this.#sendInvalidResponse(seq, 'malformed fields');
+            return;
+        }
+
+        if (!message.identity || !message.identity.addr || !message.identity.pos) {
+            // invalid message
+            this.#log('VON: invalid leave notify message', message);
+            this.#sendInvalidResponse(seq, 'malformed fields');
+            return;
+        }
+
+        const leaving = identityToVONNeighbor(message.leavingNode);
+
+        // 1. The *notifyable neighbor* runs the *remove node algorithm*.
+        await this.node.removeNode(leaving);
+
+        // 2. The *notifyable neighbor* responds with a *LEAVE RECOVER message* containing the *potential EN neighbors* of the *notifying node*.
+        const connectedNodeNeighbors = this.node.getNeighborNeighbors(identityToVONNeighbor(message.identity));
+
+        await this.#send({
+            field: 'leaveRecover',
+            value: {
+                sequence: seq,
+                potentialNeighbors: connectedNodeNeighbors.map(n => vonNeighborToIdentity(n))
+            }
+        });
     }
 
     async #handleJoin(seq: string, message: Identity) {
@@ -502,6 +554,53 @@ export class VONConnection extends EventEmitter {
                 }
             });
         });
+    }
+
+    async leave() {
+        const neighbors = this.node.getNeighbors();
+
+        await this.#send({
+            field: 'leave',
+            value: {
+                identity: this.node.getIdentity(),
+                neighbors: neighbors.map(n => vonNeighborToIdentity(n))
+            }
+        })
+    }
+
+    async leaveNotify(leaving: VONNeighbor): Promise<VONNeighbor[]> {
+        const seq = await this.#send({
+            field: 'leaveNotify',
+            value: {
+                identity: this.node.getIdentity(),
+                leavingNode: vonNeighborToIdentity(leaving)
+            }
+        });
+
+        return new Promise<VONNeighbor[]>((resolve, reject) => {
+            this.once('leave-recover', (res: LeaveRecoverMessage) => {
+                if (res.sequence === seq) {
+                    resolve(res.potentialNeighbors.map(n => identityToVONNeighbor(n)));
+                }
+            });
+        });
+    }
+
+    /**
+     * Gracefully close the connection to the node if it is not yet closed.
+     * @returns A promise that resolves when the connection has been closed.
+     */
+    terminate(): Promise<void> {
+        if (!this.#conn.closed) {
+            return new Promise<void>((resolve, reject) => {
+                this.#conn.once('close', () => {
+                    resolve();
+                });
+                this.#conn.end();
+            });
+        }
+
+        return Promise.resolve();
     }
 
     /**

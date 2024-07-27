@@ -353,6 +353,75 @@ export class VONNode extends EventEmitter implements IVONNode {
         }
     }
 
+    getNeighborNeighbors(neighbor: VONNeighbor) {
+        const neighborIndex = indexOfNeighbor(this.#enclosingNeighbors, neighbor.addr);
+        if (neighborIndex === -1)
+            throw new Error('Neighbor not found');
+
+        const neighborIndices = Array.from(this.#voronoi.neighbors(neighborIndex + 1));
+
+        return neighborIndices.map(n => {
+            if (n === 0)
+                return identityToVONNeighbor(this.getIdentity());
+            return this.#enclosingNeighbors[n - 1];
+        });
+    }
+
+    /**
+     * The *remove node algorithm* is used by a *node* to remove a *leaving node* from its neighborhood.
+     * @param leaving The leaving node.
+     * @param _notifyableNeighbors The list of notifyable neighbors, if available from a LEAVE message.
+     */
+    async removeNode(leaving: VONNeighbor, _notifyableNeighbors?: VONNeighbor[]) {
+        const leavingIndex = indexOfNeighbor(this.#enclosingNeighbors, leaving.addr);
+
+        // 1. If the *leaving node* is not a neighbor of the *node*, the algorithm ends.
+        if (leavingIndex === -1) 
+            return;
+
+        // 2. If available from a *LEAVE message*, consider all the *EN neighbors* of the *leaving node* as *notifyable neighbors*. Otherwise, consider all *overlap neighbors* of the *leaving node* as *notifyable neighbors*.
+        const notifyableNeighbors = Array.isArray(_notifyableNeighbors) ? _notifyableNeighbors : this.#computeOverlapNeighbors(leaving);
+
+        // 3. Terminate the connection to the *leaving node* and remove it from the *EN neighbors* and *local Voronoi diagram*.
+        this.#enclosingNeighbors.splice(leavingIndex, 1);
+
+        // 3. Send a *LEAVE NOTIFY message* to each of the *notifyable neighbors*.
+        const potentialENs: VONNeighbor[] = this.getNeighbors();
+        for (const neighbor of notifyableNeighbors) {
+            const conn = await this.getConnection(neighbor.addr);
+            const potentialNeighbors = await conn.leaveNotify(leaving);
+            potentialENs.push(...potentialNeighbors);
+        }
+
+        // 4. The node uses the complete set of *potential EN neighbors* from the *overlap neighbors* to update its *EN neighbors*.
+        // 5. The *node* updates its *local Voronoi diagram* to reflect the new *EN neighbors*.
+        this.addMultipleNodes(potentialENs);
+    }
+
+    /**
+     * Calculates neighbors that are common between the current node and another node.
+     * 
+     * @param other The other node to compute overlap neighbors with
+     * @returns The overlap neighbors between the current node and the other node
+     */
+    #computeOverlapNeighbors(other: VONNeighbor): VONNeighbor[] {
+        const otherNodeIndex = indexOfNeighbor(this.#enclosingNeighbors, other.addr);
+
+        const thisNodeNeighborsIds = Array.from(this.#voronoi.neighbors(0));
+
+        const otherNodeNeighborsIds = Array.from(this.#voronoi.neighbors(otherNodeIndex + 1));
+
+        const commonNeighborsIds = thisNodeNeighborsIds.filter(id => otherNodeNeighborsIds.includes(id));
+
+        const commonNeighbors = commonNeighborsIds.map(id => {
+            if (id === 0)
+                return identityToVONNeighbor(this.getIdentity());
+            return this.#enclosingNeighbors[id - 1];
+        });
+
+        return commonNeighbors;
+    }
+
     /**
      * Get a list of enclosing neighbors (ENs)
      * @returns A list of enclosing neighbors
@@ -452,8 +521,15 @@ export class VONNode extends EventEmitter implements IVONNode {
         this.addMultipleNodes(neighbors);
     }
 
-    leave(): void {
-        throw new Error('Method not implemented.');
+    async leave() {
+        // 1. The *leaving node* sends a *LEAVE message* to all its *EN neighbors* containing a list of all its *EN neighbors*.
+        const neighbors = this.getNeighbors();
+        for (const neighbor of neighbors) {
+            const conn = await this.getConnection(neighbor.addr);
+            await conn.leave();
+            // 2. Either the *leaving node* or the *EN neighbors* will then terminate the connection, whichever comes first.
+            await conn.terminate();
+        }
     }
 
     #log(...args: unknown[]) {

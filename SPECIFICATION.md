@@ -59,6 +59,15 @@ The following is the procedure for a *node* to move in the network:
 4. The *moving node* determines its new *EN neighbors* from the constructed *local Voronoi diagram*.
 5. The *moving node* terminates connections that are now unnecessary (those that are not its *EN neighbors*).
 
+## LEAVE
+
+We'll make use of *overlap neighbors* for neighbor rediscovery when a node leaves the network.
+
+The following is the procedure followed by a *leaving node*:
+1. The *leaving node* sends a *LEAVE message* to all its *EN neighbors* containing a list of all its *EN neighbors*.
+2. Either the *leaving node* or the *EN neighbors* will then terminate the connection, whichever comes first.
+3. The *neighboring node* receives the message and runs the *remove node algorithm*.
+
 # VON Algorithms
 
 ## Add Node Algorithm
@@ -68,6 +77,20 @@ The *add node algorithm* is used by a *node* to add a *joining node* to its neig
 2. The *node* creates a *local Voronoi diagram* using the *EN node set*.
 3. The *node* determines its new *EN neighbors* from the constructed *local Voronoi diagram*.
 4. The *node* updates its *EN neighbors* to the new set determined from the *local Voronoi diagram*.
+
+## Remove Node Algorithm
+
+For this section *overlap neighbors* are nodes that are neighbors of both the *leaving node* and the *node*.
+
+The *remove node algorithm* is used by a *node* to remove a *leaving node* from its neighborhood. The algorithm is as follows:
+1. If the *leaving node* is not a neighbor of the *node*, the algorithm ends.
+2. If available from a *LEAVE message*, consider all the *EN neighbors* of the *leaving node* as *notifyable neighbors*. Otherwise, consider all *overlap neighbors* of the *leaving node* as *notifyable neighbors*.
+3. Terminate the connection to the *leaving node* and remove it from the *EN neighbors* and *local Voronoi diagram*.
+3. Send a *LEAVE NOTIFY message* to each of the *notifyable neighbors*.
+    1. The *notifyable neighbor* runs the *remove node algorithm*.
+    2. The *notifyable neighbor* responds with a *LEAVE RECOVER message* containing the *potential EN neighbors* of the *notifying node*.
+4. The node uses the complete set of *potential EN neighbors* from the *overlap neighbors* to update its *EN neighbors*.
+5. The *node* updates its *local Voronoi diagram* to reflect the new *EN neighbors*.
 
 ## Move Node Algorithm
 
@@ -145,3 +168,8 @@ The WELCOME message is sent by the *acceptor node* to the *joining node* to welc
 
 - `sequence`: This field is required and contains the sequence number of the message being acknowledged.
 - `neighbors`: Predicted neighbors of the moving node.
+
+## LEAVE message
+
+- `connection_info`: yep.
+- `neighbors`: The list of neighbors of the leaving node.
