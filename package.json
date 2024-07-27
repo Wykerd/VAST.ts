@@ -5,10 +5,10 @@
     "main": "dist/index.js",
     "type": "module",
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1",
-        "build:proto": "npx pb-gen-ts --entry-path=\"src/proto\" --out-dir=\"src/proto/generated\" --ext-in-import=\".js\"",
-        "build:esm": "npx tsc",
-        "lint": "npx eslint src"
+        "test": "mocha -r tsx 'tests/**/*.ts'",
+        "build:proto": "pb-gen-ts --entry-path=\"src/proto\" --out-dir=\"src/proto/generated\" --ext-in-import=\".js\"",
+        "build:esm": "tsc",
+        "lint": "eslint src"
     },
     "keywords": [
         "SPS",
@@ -21,10 +21,14 @@
     "license": "Apache-2.0",
     "devDependencies": {
         "@eslint/js": "^9.5.0",
+        "@types/chai": "^4.3.16",
         "@types/d3-delaunay": "^6.0.4",
         "@types/eslint__js": "^8.42.3",
+        "@types/mocha": "^10.0.7",
         "@types/node": "^20.14.5",
+        "chai": "^4.5.0",
         "eslint": "^9.5.0",
+        "mocha": "^10.7.0",
         "pbkit": "^0.0.70",
         "tsx": "^4.15.6",
         "typescript": "^5.4.5",
