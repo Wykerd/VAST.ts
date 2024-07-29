@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { VONNode } from '../src/von/node.js';
-import { identityToVONNeighbor } from '../src/von/neighbor.js';
+import { identityToVONNeighbor, vonNeighborToIdentity } from '../src/von/neighbor.js';
 
 describe('Voronoi Overlay Network (VON)', () => {
     let nodes: VONNode[] = [];
@@ -55,18 +55,53 @@ describe('Voronoi Overlay Network (VON)', () => {
     });
 
     it('connect to an existing network with multiple nodes', async () => {
-        const joining = await VONNode.create(
-            {
-                hostname: '0.0.0.0',
-                port: 8183,
-            },
-            8183,
-        );
-    
-        await joining.join('von://0.0.0.0:8181', [1, 1], 10);
+        const sites = [
+            [-1, 0],
+            [1, 0],
+            [0, -1]
+        ];
 
-        expect(joining.getNeighbors()).to.have.deep.members(nodes.map(node => identityToVONNeighbor(node.getIdentity())));
-        expect(joining.containsPoint([1, 1])).to.be.true;
-        expect(joining.containsPoint([0, 0])).to.be.false;
+        for (let i = 0; i < sites.length; i++) {
+            const site = sites[i]!;
+            const joining = await VONNode.create(
+                {
+                    hostname: '0.0.0.0',
+                    port: 8183 + i,
+                },
+                8183 + i,
+            );
+        
+            await joining.join('von://0.0.0.0:8181', site, 10);
+    
+            expect(joining.containsPoint(site)).to.be.true;
+            expect(joining.containsPoint([0, 0])).to.be.false;
+
+            nodes.push(joining);
+        }
     });
+
+    it('correct neighborhoods', () => {
+        const identities = nodes.map(node => node.getIdentity());
+
+        const correctNeighbors = [
+            [1, 2, 3, 4],
+            [0, 2, 3],
+            [0, 1, 4],
+            [0, 1, 4],
+            [0, 2, 3]
+        ];
+
+        for (let i = 0; i < nodes.length; i++) {
+            const node = nodes[i]!;
+            const neighbors = node.getNeighbors().map(n => vonNeighborToIdentity(n)!);
+
+            const expected = correctNeighbors[i]!.map(index => identities[index]!);
+
+            expect(neighbors).to.have.deep.members(expected);
+        }
+    })
+
+    it('move a node', async () => {
+
+    })
 });
