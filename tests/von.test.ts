@@ -1,6 +1,9 @@
 import { expect } from 'chai';
 import { VONNode } from '../src/von/node.js';
+import { createFileLogger } from '../src/devtools/logging.js';
 import { identityToVONNeighbor, vonNeighborToIdentity } from '../src/von/neighbor.js';
+
+const logger = createFileLogger('von-test.log');
 
 describe('Voronoi Overlay Network (VON)', () => {
     let nodes: VONNode[] = [];
@@ -24,6 +27,8 @@ describe('Voronoi Overlay Network (VON)', () => {
                 port: 8181,
             },
             8181,
+            undefined,
+            logger
         );
 
         gateway.initial([0, 0], 10);
@@ -43,6 +48,8 @@ describe('Voronoi Overlay Network (VON)', () => {
                 port: 8182,
             },
             8182,
+            undefined,
+            logger
         );
     
         await joining.join('von://0.0.0.0:8181', [0, 1], 10);
@@ -69,6 +76,8 @@ describe('Voronoi Overlay Network (VON)', () => {
                     port: 8183 + i,
                 },
                 8183 + i,
+                undefined,
+                logger
             );
         
             await joining.join('von://0.0.0.0:8181', site, 10);

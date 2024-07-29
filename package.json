@@ -36,6 +36,7 @@
     },
     "dependencies": {
         "d3-delaunay": "^6.0.4",
-        "tslib": "^2.6.3"
+        "tslib": "^2.6.3",
+        "winston": "^3.13.1"
     }
 }

@@ -5,11 +5,14 @@ import { vec2dFromProtobuf } from "~/spatial/types.js";
 import { VONNode } from "./node.js";
 import { VONNeighbor, deduplicateNeighbors, excludeNeighbors, identityToVONNeighbor, vonNeighborToIdentity } from "./neighbor.js";
 import EventEmitter from "node:events";
+import winston from "winston";
+import { stringify } from "~/utils.js";
 
 export type MessageTypes = NonNullable<VONPacket['message']>['field']
 
 export class VONConnection extends EventEmitter {
     #conn: Socket;
+    #logger?: winston.Logger;
 
     // Receive state machine
     #recvState: 'header' | 'message' = 'header';
@@ -19,8 +22,9 @@ export class VONConnection extends EventEmitter {
     // sequence number for messages
     #sequence: bigint = BigInt(0);
 
-    constructor(conn: Socket, public node: VONNode, public addr?: Addr) {
+    constructor(conn: Socket, public node: VONNode, public addr?: Addr, logger?: winston.Logger) {
         super();
+        this.#logger = logger;
         this.#conn = conn;
 
         this.#conn.setKeepAlive(true);
@@ -657,6 +661,9 @@ export class VONConnection extends EventEmitter {
     }
 
     #log(...args: unknown[]) {
-        console.log(`[${this.node.id} -> ${this.addr ? `${this.addr?.hostname}:${this.addr?.port}`: 'unidentified'}]`, ...args);
+        if (this.#logger) 
+            this.#logger.info(args.map(a => stringify(a)).join(' '), { fromNode: this.node.id, toNode: this.addr ? `${this.addr?.hostname}:${this.addr?.port}`: undefined });
+        else
+            console.log(`[${this.node.id} -> ${this.addr ? `${this.addr?.hostname}:${this.addr?.port}`: 'unidentified'}]`, ...args);
     }
 }

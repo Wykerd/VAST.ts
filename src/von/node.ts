@@ -8,6 +8,8 @@ import { Vector } from "~/spatial/Vector.js";
 import { Identity } from "~/proto/generated/messages/vast/index.js";
 import { VONNeighbor, identityToVONNeighbor, indexOfNeighbor } from "./neighbor.js";
 import EventEmitter from "node:events";
+import winston from "winston";
+import { stringify } from "~/utils.js";
 
 // All VON nodes have the following three core actions available to them:
 export interface IVONNode {
@@ -27,11 +29,13 @@ export class VONNode extends EventEmitter implements IVONNode {
     #aoiRadius: number = 0;
     #connections: VONConnection[] = [];
     #enclosingNeighbors: VONNeighbor[] = [];
+    #logger?: winston.Logger;
     readonly addr: Addr;
     readonly id: string;
 
-    private constructor(addr: Addr, server: Server) { 
+    private constructor(addr: Addr, server: Server, logger?: winston.Logger) { 
         super();
+        this.#logger = logger;
         this.#log(`VON: created tcp server on`, server.address());
 
         this.#server = server;
@@ -47,7 +51,7 @@ export class VONNode extends EventEmitter implements IVONNode {
 
             this.#log(`VON: incoming connection from`, incomingAddr);
 
-            const conn = new VONConnection(socket, this);
+            const conn = new VONConnection(socket, this, undefined, this.#logger);
 
             this.#connections.push(conn);
         })
@@ -64,22 +68,24 @@ export class VONNode extends EventEmitter implements IVONNode {
      *               The hostname should be the public IP address of the node or a domain name that resolves to the public IP address.
      * @param url The URL of the VON node. This will be used to create the underlying TCP listener.
      */
-    static create(advert: Addr, url: string): Promise<VONNode>;
+    static create(advert: Addr, url: string, logger?: winston.Logger): Promise<VONNode>;
     /**
      * Create a new VON node instance.
      * @param port The port of the TCP listener.
      * @param hostname The hostname of the TCP listener. If not provided, the listener will listen on all interfaces (0.0.0.0)
      */
-    static create(advert: Addr, port: number, hostname?: string): Promise<VONNode>;
+    static create(advert: Addr, port: number, hostname?: string, logger?: winston.Logger): Promise<VONNode>;
     static async create(...params: unknown[]) {
         const nodeConnInfo: Addr = {
             hostname: '',
             port: 0
         }
+        let logger: winston.Logger | undefined = undefined;
         if (typeof params[1] === 'number') {
             // Arguments are port and hostname
             nodeConnInfo.port = params[1];
             nodeConnInfo.hostname = params[2] as string;
+            logger = params[3] as winston.Logger;
         } else {
             // Arguments are url
             const url = new URL(params[1] as string);
@@ -89,6 +95,7 @@ export class VONNode extends EventEmitter implements IVONNode {
 
             nodeConnInfo.hostname = url.hostname;
             nodeConnInfo.port = url.port ? parseInt(url.port) : DEFAULT_PORT;
+            logger = params[2] as winston.Logger;
         }
 
         // Create the underlying TCP listener
@@ -98,7 +105,7 @@ export class VONNode extends EventEmitter implements IVONNode {
         await new Promise<void>(resolve => server.listen(nodeConnInfo.port, nodeConnInfo.hostname || '0.0.0.0', resolve));
 
         // We're good to go
-        return new VONNode(params[0] as Addr, server);
+        return new VONNode(params[0] as Addr, server, logger);
     }
 
     /**
@@ -217,7 +224,7 @@ export class VONNode extends EventEmitter implements IVONNode {
 
         this.#log(`VON: connected to`, addr);
 
-        const vonConn = new VONConnection(conn, this, addr);
+        const vonConn = new VONConnection(conn, this, addr, this.#logger);
 
         this.#connections.push(vonConn);
         
@@ -533,6 +540,9 @@ export class VONNode extends EventEmitter implements IVONNode {
     }
 
     #log(...args: unknown[]) {
-        console.log(`[${this.id}]`, ...args);
+        if (this.#logger) 
+            this.#logger.info(args.map(a => stringify(a)).join(' '), { node: this.id });
+        else
+            console.log(`[${this.id}]`, ...args);
     }
 }
