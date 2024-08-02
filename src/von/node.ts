@@ -64,17 +64,19 @@ export class VONNode extends EventEmitter implements IVONNode {
 
     /**
      * Create a new VON node instance. 
-     * @param advert This is the advertised address of the VON node. It will be used to accept incoming connections.
+     * @param endpoint This is the endpoint of the VON node. It will be used to accept incoming connections.
      *               The hostname should be the public IP address of the node or a domain name that resolves to the public IP address.
      * @param url The URL of the VON node. This will be used to create the underlying TCP listener.
      */
-    static create(advert: Addr, url: string, logger?: winston.Logger): Promise<VONNode>;
+    static create(endpoint: Addr, url: string, logger?: winston.Logger): Promise<VONNode>;
     /**
      * Create a new VON node instance.
+     * @param endpoint This is the endpoint of the VON node. It will be used to accept incoming connections.
+     *               The hostname should be the public IP address of the node or a domain name that resolves to the public IP address.
      * @param port The port of the TCP listener.
      * @param hostname The hostname of the TCP listener. If not provided, the listener will listen on all interfaces (0.0.0.0)
      */
-    static create(advert: Addr, port: number, hostname?: string, logger?: winston.Logger): Promise<VONNode>;
+    static create(endpoint: Addr, port: number, hostname?: string, logger?: winston.Logger): Promise<VONNode>;
     static async create(...params: unknown[]) {
         const nodeConnInfo: Addr = {
             hostname: '',
