@@ -21,15 +21,14 @@ describe('Voronoi Overlay Network (VON)', () => {
     };
 
     it('create new network', async () => {
-        const gateway = await VONNode.create(
-            {
+        const gateway = await VONNode.create({
+            endpoint: {
                 hostname: '0.0.0.0',
                 port: 8181,
             },
-            8181,
-            undefined,
-            logger
-        );
+            port: 8181,
+            logger,
+        });
 
         gateway.initial([0, 0], 10);
 
@@ -42,15 +41,14 @@ describe('Voronoi Overlay Network (VON)', () => {
     });
 
     it('connect to an existing network', async () => {
-        const joining = await VONNode.create(
-            {
+        const joining = await VONNode.create({
+            endpoint: {
                 hostname: '0.0.0.0',
                 port: 8182,
             },
-            8182,
-            undefined,
-            logger
-        );
+            port: 8182,
+            logger,
+        });
     
         await joining.join('von://0.0.0.0:8181', [0, 1], 10);
         
@@ -70,15 +68,14 @@ describe('Voronoi Overlay Network (VON)', () => {
 
         for (let i = 0; i < sites.length; i++) {
             const site = sites[i]!;
-            const joining = await VONNode.create(
-                {
+            const joining = await VONNode.create({
+                endpoint: {
                     hostname: '0.0.0.0',
                     port: 8183 + i,
                 },
-                8183 + i,
-                undefined,
-                logger
-            );
+                port: 8183 + i,
+                logger,
+            });
         
             await joining.join('von://0.0.0.0:8181', site, 10);
     

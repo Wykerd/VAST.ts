@@ -22,6 +22,15 @@ export interface IVONNode {
     leave(): void;
 }
 
+export type VONCreateOptions = {
+    endpoint: Addr, 
+    logger?: winston.Logger
+} & ({
+    url: string
+} | {
+    port: number, hostname?: string
+});
+
 export class VONNode extends EventEmitter implements IVONNode {
     #server: Server;
     #voronoi: Voronoi<Delaunay.Point>;
@@ -63,41 +72,32 @@ export class VONNode extends EventEmitter implements IVONNode {
     }
 
     /**
-     * Create a new VON node instance. 
-     * @param endpoint This is the endpoint of the VON node. It will be used to accept incoming connections.
-     *               The hostname should be the public IP address of the node or a domain name that resolves to the public IP address.
-     * @param url The URL of the VON node. This will be used to create the underlying TCP listener.
-     */
-    static create(endpoint: Addr, url: string, logger?: winston.Logger): Promise<VONNode>;
-    /**
      * Create a new VON node instance.
-     * @param endpoint This is the endpoint of the VON node. It will be used to accept incoming connections.
+     * @param params.endpoint This is the endpoint of the VON node. It will be used to accept incoming connections.
      *               The hostname should be the public IP address of the node or a domain name that resolves to the public IP address.
-     * @param port The port of the TCP listener.
-     * @param hostname The hostname of the TCP listener. If not provided, the listener will listen on all interfaces (0.0.0.0)
+     * @param params.url The URL of the VON node. This will be used to create the underlying TCP listener.
+     * @param params.port The port of the TCP listener.
+     * @param params.hostname The hostname of the TCP listener. If not provided, the listener will listen on all interfaces (0.0.0.0)
      */
-    static create(endpoint: Addr, port: number, hostname?: string, logger?: winston.Logger): Promise<VONNode>;
-    static async create(...params: unknown[]) {
+    static async create(params: VONCreateOptions): Promise<VONNode> {
         const nodeConnInfo: Addr = {
             hostname: '',
             port: 0
         }
-        let logger: winston.Logger | undefined = undefined;
-        if (typeof params[1] === 'number') {
+        const logger = params.logger;
+        if ('port' in params) {
             // Arguments are port and hostname
-            nodeConnInfo.port = params[1];
-            nodeConnInfo.hostname = params[2] as string;
-            logger = params[3] as winston.Logger;
+            nodeConnInfo.port = params.port;
+            nodeConnInfo.hostname = params.hostname || '';
         } else {
             // Arguments are url
-            const url = new URL(params[1] as string);
+            const url = new URL(params.url);
 
             if (url.protocol !== 'von:')
                 throw new Error('URL protocol must be von:');
 
             nodeConnInfo.hostname = url.hostname;
             nodeConnInfo.port = url.port ? parseInt(url.port) : DEFAULT_PORT;
-            logger = params[2] as winston.Logger;
         }
 
         // Create the underlying TCP listener
@@ -107,7 +107,7 @@ export class VONNode extends EventEmitter implements IVONNode {
         await new Promise<void>(resolve => server.listen(nodeConnInfo.port, nodeConnInfo.hostname || '0.0.0.0', resolve));
 
         // We're good to go
-        return new VONNode(params[0] as Addr, server, logger);
+        return new VONNode(params.endpoint, server, logger);
     }
 
     /**
