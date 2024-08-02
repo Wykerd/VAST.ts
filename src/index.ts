@@ -1,19 +1,7 @@
-import { VONNode } from "./von/node.js";
+// Core exports
+export * from './von/index.js';
+export * from './spatial/index.js';
 
-async function main() {
-    const gateway = await VONNode.create({
-        hostname: '0.0.0.0',
-        port: 8181
-    }, 8181);
-
-    gateway.initial([0, 0], 10);
-
-    const joining = await VONNode.create({
-        hostname: '0.0.0.0',
-        port: 8182
-    }, 8182);
-
-    await joining.join('von://0.0.0.0:8181', [1, 1], 10);
-}
-
-main();
+// Namespaced exports (not generally used)
+export * as Utils from './utils.js';
+export * as Consts from './consts.js';
