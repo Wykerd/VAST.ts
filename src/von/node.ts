@@ -6,7 +6,7 @@ import { Delaunay, Voronoi } from 'd3-delaunay';
 import { VONConnection } from "./connection.js";
 import { Vector } from "~/spatial/Vector.js";
 import { Identity } from "~/proto/generated/messages/vast/index.js";
-import { VONNeighbor, identityToVONNeighbor, indexOfNeighbor } from "./neighbor.js";
+import { VONNeighbor, filterOutNeighbor, identityToVONNeighbor, indexOfNeighbor } from "./neighbor.js";
 import EventEmitter from "node:events";
 import winston from "winston";
 import { stringify } from "~/utils.js";
@@ -365,7 +365,7 @@ export class VONNode extends EventEmitter implements IVONNode {
     getNeighborNeighbors(neighbor: VONNeighbor) {
         const neighborIndex = indexOfNeighbor(this.#enclosingNeighbors, neighbor.addr);
         if (neighborIndex === -1)
-            throw new Error('Neighbor not found');
+            throw new Error(`Could not find neighbor ${neighbor.addr.hostname}:${neighbor.addr.port}`);
 
         const neighborIndices = Array.from(this.#voronoi.neighbors(neighborIndex + 1));
 
@@ -373,7 +373,7 @@ export class VONNode extends EventEmitter implements IVONNode {
             if (n === 0)
                 return identityToVONNeighbor(this.getIdentity());
             return this.#enclosingNeighbors[n - 1];
-        });
+        }).filter(n => !!n); // TODO: we might not have the neighbor information (its not a enclosing neighbor). To be fixed when we have second order neighbors.
     }
 
     /**
@@ -389,10 +389,12 @@ export class VONNode extends EventEmitter implements IVONNode {
             return;
 
         // 2. If available from a *LEAVE message*, consider all the *EN neighbors* of the *leaving node* as *notifyable neighbors*. Otherwise, consider all *overlap neighbors* of the *leaving node* as *notifyable neighbors*.
-        const notifyableNeighbors = Array.isArray(_notifyableNeighbors) ? _notifyableNeighbors : this.#computeOverlapNeighbors(leaving);
+        const notifyableNeighbors = filterOutNeighbor(Array.isArray(_notifyableNeighbors) ? _notifyableNeighbors : this.#computeOverlapNeighbors(leaving), this.addr);
 
         // 3. Terminate the connection to the *leaving node* and remove it from the *EN neighbors* and *local Voronoi diagram*.
+        const leavingNode = await this.getConnection(leaving.addr);
         this.#enclosingNeighbors.splice(leavingIndex, 1);
+        await leavingNode.terminate();
 
         // 3. Send a *LEAVE NOTIFY message* to each of the *notifyable neighbors*.
         const potentialENs: VONNeighbor[] = this.getNeighbors();

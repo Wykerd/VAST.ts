@@ -77,3 +77,8 @@ export function vonNeighborToIdentity(neighbor: VONNeighbor): Identity {
         aoiRadius: neighbor.aoiRadius
     }
 }
+
+export function filterOutNeighbor(neigborhood: VONNeighbor[], me: Addr) {
+    // remove me from the neighborhood
+    return neigborhood.filter(n => !(n.addr.hostname === me.hostname && n.addr.port === me.port));
+}
