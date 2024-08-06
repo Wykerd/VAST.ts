@@ -103,11 +103,34 @@ describe('Voronoi Overlay Network (VON)', () => {
 
             const expected = correctNeighbors[i]!.map(index => identities[index]!);
 
+            expect(neighbors.length).to.equal(expected.length);
             expect(neighbors).to.have.deep.members(expected);
         }
     })
 
     it('move a node', async () => {
+        const node = nodes[0]!;
 
+        await node.move([-1, -1]);
+
+        const correctNeighbors = [
+            [2, 4],
+            [2, 3],
+            [0, 1, 4],
+            [1, 4],
+            [0, 2, 3]
+        ];
+
+        const identities = nodes.map(node => node.getIdentity());
+
+        for (let i = 0; i < nodes.length; i++) {
+            const node = nodes[i]!;
+            const neighbors = node.getNeighbors().map(n => vonNeighborToIdentity(n)!);
+
+            const expected = correctNeighbors[i]!.map(index => identities[index]!);
+
+            expect(neighbors.length).to.equal(expected.length);
+            expect(neighbors).to.have.deep.members(expected);
+        }
     })
 });
