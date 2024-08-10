@@ -591,11 +591,14 @@ export class VONConnection extends EventEmitter {
 
     #waitForAck(seq: string) {
         return new Promise<void>((resolve, reject) => {
-            this.once('acknowledge', (res: AcknowledgeMessage) => {
+            const handler = (res: AcknowledgeMessage) => {
                 if (res.sequence === seq) {
                     resolve();
+                    this.off('acknowledge', handler);
                 }
-            });
+            };
+
+            this.on('acknowledge', handler);
         });
     }
 
