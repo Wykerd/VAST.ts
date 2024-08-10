@@ -547,13 +547,14 @@ export class VONNode extends EventEmitter implements IVONNode {
             const vonNeighbors = newNeighbors.map(identity => identityToVONNeighbor(identity));
             // These nodes are added to the *EN node set*.
             neighbors.push(...vonNeighbors);
+            neighbors.push(...res.oneHopNeighbors.map(n => identityToVONNeighbor(n)));
             unseenNeighbors.push(...vonNeighbors.map(n => n.addr));
         }
 
         // The *moving node* uses all the nodes in the *EN node set* to create a *local Voronoi diagram*.
         this.clearNeighbors();
         // this takes care of updating the voronoi and also updating the EN list.
-        this.addMultipleNodes(neighbors);
+        this.addMultipleNodes(filterOutNeighbor(deduplicateNeighbors(neighbors), this.addr));
     }
 
     async leave() {
