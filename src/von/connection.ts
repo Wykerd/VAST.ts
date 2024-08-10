@@ -1,9 +1,9 @@
 import { Socket } from "node:net";
 import { encodeBinary as encodeVONPacket, decodeBinary as decodeVONPacket } from "~/proto/generated/messages/vast/VONPacket.js";
-import { AcknowledgeMessage, Addr, HelloMessage, HelloResponseMessage, Identity, LeaveMessage, LeaveNotifyMessage, LeaveRecoverMessage, MoveResponseMessage, VONPacket, WelcomeMessage } from "~/proto/generated/messages/vast/index.js";
+import { AcknowledgeMessage, Addr, HelloMessage, HelloResponseMessage, Identity, LeaveMessage, LeaveNotifyMessage, LeaveRecoverMessage, MoveResponseMessage, NeighborhoodMessage, VONPacket, WelcomeMessage } from "~/proto/generated/messages/vast/index.js";
 import { vec2dFromProtobuf } from "~/spatial/types.js";
 import { VONNode } from "./node.js";
-import { VONNeighbor, deduplicateNeighbors, excludeNeighbors, identityToVONNeighbor, vonNeighborToIdentity } from "./neighbor.js";
+import { VONNeighbor, deduplicateNeighbors, excludeNeighbors, filterOutNeighbor, identityToVONNeighbor, indexOfNeighbor, vonNeighborToIdentity } from "./neighbor.js";
 import EventEmitter from "node:events";
 import winston from "winston";
 import { stringify } from "~/utils.js";
@@ -149,6 +149,9 @@ export class VONConnection extends EventEmitter {
             case 'leaveRecover':
                 this.emit('leave-recover', packet.message.value);
                 break;
+            case 'neighborhood':
+                this.#handleNeighborhood(packet.sequence, packet.message.value);
+                break;
             default:
                 this.#log(`VON: received unknown message type`, packet.message.field, packet.message.value);
                 break;
@@ -168,6 +171,49 @@ export class VONConnection extends EventEmitter {
             throw new Error('Connection already exists. Unimplemented behavior.')
         }
         this.addr = addr;
+    }
+
+    async #handleNeighborhood(seq: string, message: NeighborhoodMessage) {
+        if (!message.identity || !message.identity.addr || !message.identity.pos) {
+            // invalid message
+            this.#log('VON: invalid neighborhood message', message);
+            this.#sendInvalidResponse(seq, 'malformed fields');
+            return;
+        }
+
+        this.#identify(message.identity.addr);
+
+        await this.#acknowledge(seq);
+
+        const neighbors = this.node.getNeighbors();
+
+        if (indexOfNeighbor(neighbors, message.identity.addr) === -1) {
+            // the node is not a neighbor, invalid
+            this.#log('VON: invalid neighborhood message', message);
+            this.#sendInvalidResponse(seq, 'not a neighbor');
+            return;
+        }
+
+        const sender = identityToVONNeighbor(message.identity);
+
+        const currentNeighbors = this.node.getNeighborNeighbors(sender);
+
+        const noLongerTwoHop = excludeNeighbors(currentNeighbors, message.neighbors.map(n => n.addr!));
+
+        this.node.forgetNeighbors(noLongerTwoHop);
+
+        const neighborsToAdd = excludeNeighbors(
+            deduplicateNeighbors([
+                ...message.neighbors.map(n => identityToVONNeighbor(n))
+            ]),
+            [
+                this.node.addr,
+                // TODO: replace with getNeighborhood() or something (include the second hop neighbors)
+                ...this.node.getNeighbors().map(n => n.addr)
+            ]
+        );
+
+        this.node.addMultipleNodes(neighborsToAdd);
     }
 
     async #handleLeave(seq: string, message: LeaveMessage) {
@@ -287,11 +333,14 @@ export class VONConnection extends EventEmitter {
 
         const acceptorNode = identityToVONNeighbor(message.identity);
 
-        // Using the *EN node set*, the *joining node* creates a *local Voronoi diagram*.
-        this.node.addMultipleNodes([
+        const nodesToAdd = deduplicateNeighbors([
             acceptorNode,
-            ...message.neighbors.map(n => identityToVONNeighbor(n))
+            ...message.neighbors.map(n => identityToVONNeighbor(n)),
+            ...message.oneHopNeighbors.map(n => identityToVONNeighbor(n))
         ]);
+
+        // Using the *EN node set*, the *joining node* creates a *local Voronoi diagram*.
+        this.node.addMultipleNodes(filterOutNeighbor(nodesToAdd, this.node.addr));
 
         await this.#joinFindNeighbors(acceptorNode, joinContactedSet);
     }
@@ -332,6 +381,7 @@ export class VONConnection extends EventEmitter {
             }
 
             neighbors.push(identityToVONNeighbor(res.value.identity));
+            neighbors.push(...res.value.oneHopNeighbors.map(n => identityToVONNeighbor(n)));
 
             // TODO: at this point we should check if the identities match or update the position if they don't
 
@@ -345,7 +395,7 @@ export class VONConnection extends EventEmitter {
         // It closes any connections to the *EN nodes* in the set that are not its *EN neighbors*.
         const newNeighborhood = deduplicateNeighbors(neighbors);
         this.node.clearNeighbors();
-        this.node.addMultipleNodes(newNeighborhood);
+        this.node.addMultipleNodes(filterOutNeighbor(newNeighborhood, this.node.addr));
 
         this.#log(`VON: join complete`, this.node.getNeighbors().map(n => n.addr));
 
@@ -405,10 +455,11 @@ export class VONConnection extends EventEmitter {
             return;
         }
         // The *node* runs the *add node algorithm*. 
+        const joiningNode = identityToVONNeighbor(message.identity);
         const {
             newExpectedNeighbors,
             isEnclosing
-        } = this.node.addNode(identityToVONNeighbor(message.identity));
+        } = this.node.addNode(joiningNode);
 
         // If the *joining node* is not one of the *EN neighbors*, the join request is invalid and the *node* sends a *HELLO REJECT message* to the *joining node*. The procedure ends here in this case.
         if (!isEnclosing) {
@@ -420,6 +471,19 @@ export class VONConnection extends EventEmitter {
         const missingNeighbors = excludeNeighbors(newExpectedNeighbors, message.neighbors);
 
         await this.#helloResponse(seq, missingNeighbors);
+
+        this.#syncNeighborhood(joiningNode);
+    }
+
+    async #syncNeighborhood(changeNode: VONNeighbor) {
+        const neighbors = filterOutNeighbor(this.node.getNeighbors(), changeNode.addr);
+
+        for (const neighbor of neighbors) {
+            // we need to notify our neighbors that we have a new neighbor
+            // so that they can update their second hop neighbors
+            const conn = await this.node.getConnection(neighbor.addr);
+            await conn.neighborhood();
+        }
     }
 
     #helloReject(seq: string) {
@@ -437,7 +501,8 @@ export class VONConnection extends EventEmitter {
             value: {
                 sequence: seq,
                 identity: this.node.getIdentity(),
-                missingNeighbors: missingNeighbors.map(n => vonNeighborToIdentity(n))
+                missingNeighbors: missingNeighbors.map(n => vonNeighborToIdentity(n)),
+                oneHopNeighbors: this.node.getNeighbors().map(n => vonNeighborToIdentity(n))
             }
         })
     }
@@ -467,14 +532,16 @@ export class VONConnection extends EventEmitter {
 
             // The *acceptor node* runs the *add node algorithm*.
             // The *acceptor node* determines the *joining node*'s *EN neighbors* from the constructed *local Voronoi diagram*.
-            const {
-                newExpectedNeighbors: enList
-            } = this.node.addNode({
+            const joiningNode: VONNeighbor = {
                 addr: message.addr,
                 position: position,
                 aoiRadius: message.aoiRadius,
                 conn: isThisConnection ? this : undefined
-            });
+            }
+
+            const {
+                newExpectedNeighbors: enList
+            } = this.node.addNode(joiningNode);
 
             const conn = await this.node.getConnection(message.addr);
 
@@ -483,9 +550,12 @@ export class VONConnection extends EventEmitter {
                 field: 'welcome',
                 value: {
                     neighbors: enList.map(en => vonNeighborToIdentity(en)),
+                    oneHopNeighbors: this.node.getNeighbors().map(n => vonNeighborToIdentity(n)),
                     identity: this.node.getIdentity()
                 }
             });
+
+            this.#syncNeighborhood(joiningNode);
 
             return;
         }
@@ -496,6 +566,28 @@ export class VONConnection extends EventEmitter {
         const conn = await this.node.getConnection(nextNode.addr);
 
         await conn.#joinQuery(message);
+    }
+
+    async neighborhood() {
+        const seq = await this.#send({
+            field: 'neighborhood',
+            value: {
+                identity: this.node.getIdentity(),
+                neighbors: this.node.getNeighbors().map(n => vonNeighborToIdentity(n))
+            }
+        });
+
+        return this.#waitForAck(seq);
+    }
+
+    #waitForAck(seq: string) {
+        return new Promise<void>((resolve, reject) => {
+            this.once('acknowledge', (res: AcknowledgeMessage) => {
+                if (res.sequence === seq) {
+                    resolve();
+                }
+            });
+        });
     }
 
     #joinQuery(message: Identity) {

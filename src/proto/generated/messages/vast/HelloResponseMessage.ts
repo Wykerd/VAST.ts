@@ -30,6 +30,7 @@ export declare namespace $.vast {
     sequence: string;
     identity?: Identity;
     missingNeighbors: Identity[];
+    oneHopNeighbors: Identity[];
   }
 }
 
@@ -40,6 +41,7 @@ export function getDefaultValue(): $.vast.HelloResponseMessage {
     sequence: "0",
     identity: undefined,
     missingNeighbors: [],
+    oneHopNeighbors: [],
   };
 }
 
@@ -55,6 +57,7 @@ export function encodeJson(value: $.vast.HelloResponseMessage): unknown {
   if (value.sequence !== undefined) result.sequence = tsValueToJsonValueFns.uint64(value.sequence);
   if (value.identity !== undefined) result.identity = encodeJson_1(value.identity);
   result.missingNeighbors = value.missingNeighbors.map(value => encodeJson_1(value));
+  result.oneHopNeighbors = value.oneHopNeighbors.map(value => encodeJson_1(value));
   return result;
 }
 
@@ -63,6 +66,7 @@ export function decodeJson(value: any): $.vast.HelloResponseMessage {
   if (value.sequence !== undefined) result.sequence = jsonValueToTsValueFns.uint64(value.sequence);
   if (value.identity !== undefined) result.identity = decodeJson_1(value.identity);
   result.missingNeighbors = value.missingNeighbors?.map((value: any) => decodeJson_1(value)) ?? [];
+  result.oneHopNeighbors = value.oneHopNeighbors?.map((value: any) => decodeJson_1(value)) ?? [];
   return result;
 }
 
@@ -83,6 +87,11 @@ export function encodeBinary(value: $.vast.HelloResponseMessage): Uint8Array {
   for (const tsValue of value.missingNeighbors) {
     result.push(
       [3, { type: WireType.LengthDelimited as const, value: encodeBinary_1(tsValue) }],
+    );
+  }
+  for (const tsValue of value.oneHopNeighbors) {
+    result.push(
+      [4, { type: WireType.LengthDelimited as const, value: encodeBinary_1(tsValue) }],
     );
   }
   return serialize(result);
@@ -111,6 +120,12 @@ export function decodeBinary(binary: Uint8Array): $.vast.HelloResponseMessage {
     const value = wireValues.map((wireValue) => wireValue.type === WireType.LengthDelimited ? decodeBinary_1(wireValue.value) : undefined).filter(x => x !== undefined);
     if (!value.length) break collection;
     result.missingNeighbors = value as any;
+  }
+  collection: {
+    const wireValues = wireMessage.filter(([fieldNumber]) => fieldNumber === 4).map(([, wireValue]) => wireValue);
+    const value = wireValues.map((wireValue) => wireValue.type === WireType.LengthDelimited ? decodeBinary_1(wireValue.value) : undefined).filter(x => x !== undefined);
+    if (!value.length) break collection;
+    result.oneHopNeighbors = value as any;
   }
   return result;
 }

@@ -29,6 +29,7 @@ message VONPacket {
         LeaveMessage leave = 13;
         LeaveNotifyMessage leave_notify = 14;
         LeaveRecoverMessage leave_recover = 15;
+        NeighborhoodMessage neighborhood = 16;
     }
 }
 
@@ -50,6 +51,12 @@ message InvalidMessage {
 message WelcomeMessage {
     Identity identity = 1;
     repeated Identity neighbors = 2; 
+    repeated Identity one_hop_neighbors = 3;
+}
+
+message NeighborhoodMessage {
+    Identity identity = 1;
+    repeated Identity neighbors = 2;
 }
 
 message HelloMessage {
@@ -61,6 +68,7 @@ message HelloResponseMessage {
     uint64 sequence = 1;
     Identity identity = 2;
     repeated Identity missing_neighbors = 3;
+    repeated Identity one_hop_neighbors = 4;
 }
 
 message MoveResponseMessage {

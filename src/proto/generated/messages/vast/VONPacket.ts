@@ -70,6 +70,13 @@ import {
   decodeBinary as decodeBinary_10,
 } from "./LeaveRecoverMessage.js";
 import {
+  Type as NeighborhoodMessage,
+  encodeJson as encodeJson_11,
+  decodeJson as decodeJson_11,
+  encodeBinary as encodeBinary_11,
+  decodeBinary as decodeBinary_11,
+} from "./NeighborhoodMessage.js";
+import {
   tsValueToJsonValueFns,
   jsonValueToTsValueFns,
 } from "../../runtime/json/scalar.js";
@@ -107,6 +114,7 @@ export declare namespace $.vast {
       | { field: "leave", value: LeaveMessage }
       | { field: "leaveNotify", value: LeaveNotifyMessage }
       | { field: "leaveRecover", value: LeaveRecoverMessage }
+      | { field: "neighborhood", value: NeighborhoodMessage }
   );
   }
 }
@@ -185,6 +193,10 @@ export function encodeJson(value: $.vast.VONPacket): unknown {
       result.leaveRecover = encodeJson_10(value.message.value);
       break;
     }
+    case "neighborhood": {
+      result.neighborhood = encodeJson_11(value.message.value);
+      break;
+    }
   }
   return result;
 }
@@ -206,6 +218,7 @@ export function decodeJson(value: any): $.vast.VONPacket {
   if (value.leave !== undefined) result.message = {field: "leave", value: decodeJson_8(value.leave)};
   if (value.leaveNotify !== undefined) result.message = {field: "leaveNotify", value: decodeJson_9(value.leaveNotify)};
   if (value.leaveRecover !== undefined) result.message = {field: "leaveRecover", value: decodeJson_10(value.leaveRecover)};
+  if (value.neighborhood !== undefined) result.message = {field: "neighborhood", value: decodeJson_11(value.neighborhood)};
   return result;
 }
 
@@ -315,12 +328,19 @@ export function encodeBinary(value: $.vast.VONPacket): Uint8Array {
       );
       break;
     }
+    case "neighborhood": {
+      const tsValue = value.message.value;
+      result.push(
+        [16, { type: WireType.LengthDelimited as const, value: encodeBinary_11(tsValue) }],
+      );
+      break;
+    }
   }
   return serialize(result);
 }
 
 const oneofFieldNumbersMap: { [oneof: string]: Set<number> } = {
-  message: new Set([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]),
+  message: new Set([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]),
 };
 
 const oneofFieldNamesMap = {
@@ -338,6 +358,7 @@ const oneofFieldNamesMap = {
     [13, "leave" as const],
     [14, "leaveNotify" as const],
     [15, "leaveRecover" as const],
+    [16, "neighborhood" as const],
   ]),
 };
 
@@ -380,6 +401,7 @@ export function decodeBinary(binary: Uint8Array): $.vast.VONPacket {
       [13](wireValue: Field) { return wireValue.type === WireType.LengthDelimited ? decodeBinary_8(wireValue.value) : undefined; },
       [14](wireValue: Field) { return wireValue.type === WireType.LengthDelimited ? decodeBinary_9(wireValue.value) : undefined; },
       [15](wireValue: Field) { return wireValue.type === WireType.LengthDelimited ? decodeBinary_10(wireValue.value) : undefined; },
+      [16](wireValue: Field) { return wireValue.type === WireType.LengthDelimited ? decodeBinary_11(wireValue.value) : undefined; },
     };
     const value = (wireValueToTsValueMap[fieldNumber as keyof typeof wireValueToTsValueMap] as any)?.(wireValue!);
     if (value === undefined) break oneof;

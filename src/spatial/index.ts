@@ -1,2 +1,2 @@
 export * from './types.js';
-export * from './Vector.js';
+export * from './vector.js';

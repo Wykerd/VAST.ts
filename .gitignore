@@ -131,3 +131,5 @@ dist
 
 # macOS Finder directory files
 .DS_Store
+
+tmp/

@@ -4,9 +4,9 @@ import { Vec2d, vec2dToProtobuf } from "~/spatial/types.js";
 import { createServer, createConnection, Server } from 'node:net';
 import { Delaunay, Voronoi } from 'd3-delaunay';
 import { VONConnection } from "./connection.js";
-import { Vector } from "~/spatial/Vector.js";
+import { Vector } from "~/spatial/vector.js";
 import { Identity } from "~/proto/generated/messages/vast/index.js";
-import { VONNeighbor, filterOutNeighbor, identityToVONNeighbor, indexOfNeighbor } from "./neighbor.js";
+import { VONNeighbor, excludeNeighbors, filterOutNeighbor, identityToVONNeighbor, indexOfNeighbor } from "./neighbor.js";
 import EventEmitter from "node:events";
 import winston from "winston";
 import { stringify } from "~/utils.js";
@@ -360,6 +360,30 @@ export class VONNode extends EventEmitter implements IVONNode {
             newExpectedNeighbors: newNodeExpectedNeighbors.filter(n => n !== null) as VONNeighbor[],
             isEnclosing: newNodeExpectedNeighbors.some(n => n == null)
         }
+    }
+
+    forgetNeighbors(nodes: VONNeighbor[]) {
+        this.#enclosingNeighbors = excludeNeighbors(
+            this.#enclosingNeighbors,
+            nodes.map(n => n.addr)
+        );
+        const { 
+            voronoi,
+            additionalConsiderationsOffset
+        } = this.#computeVoronoi();
+
+        this.#voronoi = voronoi;
+
+        const neighbors = Array.from(voronoi.neighbors(0));
+
+        const newNeighborhood = neighbors.map(n => {
+            if (n < additionalConsiderationsOffset) // we're considering the exiting neighbors
+                return this.#enclosingNeighbors[n - 1]; // remember that the first node is the current node so we need to offset by 1
+            
+            throw new Error('Invalid neighbor index');
+        })
+
+        this.#enclosingNeighbors = newNeighborhood;
     }
 
     getNeighborNeighbors(neighbor: VONNeighbor) {

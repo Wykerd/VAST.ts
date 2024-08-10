@@ -21,47 +21,43 @@ import {
 } from "../../runtime/wire/deserialize.js";
 
 export declare namespace $.vast {
-  export type WelcomeMessage = {
+  export type NeighborhoodMessage = {
     identity?: Identity;
     neighbors: Identity[];
-    oneHopNeighbors: Identity[];
   }
 }
 
-export type Type = $.vast.WelcomeMessage;
+export type Type = $.vast.NeighborhoodMessage;
 
-export function getDefaultValue(): $.vast.WelcomeMessage {
+export function getDefaultValue(): $.vast.NeighborhoodMessage {
   return {
     identity: undefined,
     neighbors: [],
-    oneHopNeighbors: [],
   };
 }
 
-export function createValue(partialValue: Partial<$.vast.WelcomeMessage>): $.vast.WelcomeMessage {
+export function createValue(partialValue: Partial<$.vast.NeighborhoodMessage>): $.vast.NeighborhoodMessage {
   return {
     ...getDefaultValue(),
     ...partialValue,
   };
 }
 
-export function encodeJson(value: $.vast.WelcomeMessage): unknown {
+export function encodeJson(value: $.vast.NeighborhoodMessage): unknown {
   const result: any = {};
   if (value.identity !== undefined) result.identity = encodeJson_1(value.identity);
   result.neighbors = value.neighbors.map(value => encodeJson_1(value));
-  result.oneHopNeighbors = value.oneHopNeighbors.map(value => encodeJson_1(value));
   return result;
 }
 
-export function decodeJson(value: any): $.vast.WelcomeMessage {
+export function decodeJson(value: any): $.vast.NeighborhoodMessage {
   const result = getDefaultValue();
   if (value.identity !== undefined) result.identity = decodeJson_1(value.identity);
   result.neighbors = value.neighbors?.map((value: any) => decodeJson_1(value)) ?? [];
-  result.oneHopNeighbors = value.oneHopNeighbors?.map((value: any) => decodeJson_1(value)) ?? [];
   return result;
 }
 
-export function encodeBinary(value: $.vast.WelcomeMessage): Uint8Array {
+export function encodeBinary(value: $.vast.NeighborhoodMessage): Uint8Array {
   const result: WireMessage = [];
   if (value.identity !== undefined) {
     const tsValue = value.identity;
@@ -74,15 +70,10 @@ export function encodeBinary(value: $.vast.WelcomeMessage): Uint8Array {
       [2, { type: WireType.LengthDelimited as const, value: encodeBinary_1(tsValue) }],
     );
   }
-  for (const tsValue of value.oneHopNeighbors) {
-    result.push(
-      [3, { type: WireType.LengthDelimited as const, value: encodeBinary_1(tsValue) }],
-    );
-  }
   return serialize(result);
 }
 
-export function decodeBinary(binary: Uint8Array): $.vast.WelcomeMessage {
+export function decodeBinary(binary: Uint8Array): $.vast.NeighborhoodMessage {
   const result = getDefaultValue();
   const wireMessage = deserialize(binary);
   const wireFields = new Map(wireMessage);
@@ -98,12 +89,6 @@ export function decodeBinary(binary: Uint8Array): $.vast.WelcomeMessage {
     const value = wireValues.map((wireValue) => wireValue.type === WireType.LengthDelimited ? decodeBinary_1(wireValue.value) : undefined).filter(x => x !== undefined);
     if (!value.length) break collection;
     result.neighbors = value as any;
-  }
-  collection: {
-    const wireValues = wireMessage.filter(([fieldNumber]) => fieldNumber === 3).map(([, wireValue]) => wireValue);
-    const value = wireValues.map((wireValue) => wireValue.type === WireType.LengthDelimited ? decodeBinary_1(wireValue.value) : undefined).filter(x => x !== undefined);
-    if (!value.length) break collection;
-    result.oneHopNeighbors = value as any;
   }
   return result;
 }
