@@ -29,6 +29,7 @@ export declare namespace $.vast {
   export type MoveResponseMessage = {
     sequence: string;
     neighbors: Identity[];
+    oneHopNeighbors: Identity[];
   }
 }
 
@@ -38,6 +39,7 @@ export function getDefaultValue(): $.vast.MoveResponseMessage {
   return {
     sequence: "0",
     neighbors: [],
+    oneHopNeighbors: [],
   };
 }
 
@@ -52,6 +54,7 @@ export function encodeJson(value: $.vast.MoveResponseMessage): unknown {
   const result: any = {};
   if (value.sequence !== undefined) result.sequence = tsValueToJsonValueFns.uint64(value.sequence);
   result.neighbors = value.neighbors.map(value => encodeJson_1(value));
+  result.oneHopNeighbors = value.oneHopNeighbors.map(value => encodeJson_1(value));
   return result;
 }
 
@@ -59,6 +62,7 @@ export function decodeJson(value: any): $.vast.MoveResponseMessage {
   const result = getDefaultValue();
   if (value.sequence !== undefined) result.sequence = jsonValueToTsValueFns.uint64(value.sequence);
   result.neighbors = value.neighbors?.map((value: any) => decodeJson_1(value)) ?? [];
+  result.oneHopNeighbors = value.oneHopNeighbors?.map((value: any) => decodeJson_1(value)) ?? [];
   return result;
 }
 
@@ -73,6 +77,11 @@ export function encodeBinary(value: $.vast.MoveResponseMessage): Uint8Array {
   for (const tsValue of value.neighbors) {
     result.push(
       [2, { type: WireType.LengthDelimited as const, value: encodeBinary_1(tsValue) }],
+    );
+  }
+  for (const tsValue of value.oneHopNeighbors) {
+    result.push(
+      [3, { type: WireType.LengthDelimited as const, value: encodeBinary_1(tsValue) }],
     );
   }
   return serialize(result);
@@ -94,6 +103,12 @@ export function decodeBinary(binary: Uint8Array): $.vast.MoveResponseMessage {
     const value = wireValues.map((wireValue) => wireValue.type === WireType.LengthDelimited ? decodeBinary_1(wireValue.value) : undefined).filter(x => x !== undefined);
     if (!value.length) break collection;
     result.neighbors = value as any;
+  }
+  collection: {
+    const wireValues = wireMessage.filter(([fieldNumber]) => fieldNumber === 3).map(([, wireValue]) => wireValue);
+    const value = wireValues.map((wireValue) => wireValue.type === WireType.LengthDelimited ? decodeBinary_1(wireValue.value) : undefined).filter(x => x !== undefined);
+    if (!value.length) break collection;
+    result.oneHopNeighbors = value as any;
   }
   return result;
 }

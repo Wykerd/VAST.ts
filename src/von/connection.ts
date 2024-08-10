@@ -292,13 +292,20 @@ export class VONConnection extends EventEmitter {
         // The recipient nodes run the *move node algorithm* apon receiving the message.
         const potentialNeighbors = this.node.moveNeighbor(identityToVONNeighbor(message));
 
-        this.#send({
+        const seq_res = await this.#send({
             field: 'moveResponse',
             value: {
                 sequence: seq,
-                neighbors: potentialNeighbors.map(n => vonNeighborToIdentity(n))
+                neighbors: potentialNeighbors.map(n => vonNeighborToIdentity(n)),
+                oneHopNeighbors: this.node.getNeighbors().map(n => vonNeighborToIdentity(n))
             }
         })
+
+        await this.#waitForAck(seq_res);
+
+        const contactingNode = identityToVONNeighbor(message);
+
+        await this.#syncNeighborhood(contactingNode);
     }
 
     #acknowledge(seq: string) {
@@ -472,7 +479,7 @@ export class VONConnection extends EventEmitter {
 
         await this.#helloResponse(seq, missingNeighbors);
 
-        this.#syncNeighborhood(joiningNode);
+        await this.#syncNeighborhood(joiningNode);
     }
 
     async #syncNeighborhood(changeNode: VONNeighbor) {
@@ -555,7 +562,7 @@ export class VONConnection extends EventEmitter {
                 }
             });
 
-            this.#syncNeighborhood(joiningNode);
+            await this.#syncNeighborhood(joiningNode);
 
             return;
         }

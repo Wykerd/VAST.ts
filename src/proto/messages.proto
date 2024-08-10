@@ -74,6 +74,7 @@ message HelloResponseMessage {
 message MoveResponseMessage {
     uint64 sequence = 1;
     repeated Identity neighbors = 2;
+    repeated Identity one_hop_neighbors = 3;
 }
 
 message LeaveMessage {
