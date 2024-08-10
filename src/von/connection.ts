@@ -224,6 +224,7 @@ export class VONConnection extends EventEmitter {
             return;
         }
         await this.node.removeNode(identityToVONNeighbor(message.identity), message.neighbors.map(n => identityToVONNeighbor(n)));
+        await this.#syncNeighborhood(identityToVONNeighbor(message.identity));
     }
 
     async #handleLeaveNotify(seq: string, message: LeaveNotifyMessage) {
@@ -253,7 +254,8 @@ export class VONConnection extends EventEmitter {
             field: 'leaveRecover',
             value: {
                 sequence: seq,
-                potentialNeighbors: connectedNodeNeighbors.map(n => vonNeighborToIdentity(n))
+                potentialNeighbors: connectedNodeNeighbors.map(n => vonNeighborToIdentity(n)),
+                oneHopNeighbors: this.node.getNeighbors().map(n => vonNeighborToIdentity(n))
             }
         });
     }
@@ -683,7 +685,7 @@ export class VONConnection extends EventEmitter {
         return new Promise<VONNeighbor[]>((resolve, reject) => {
             this.once('leave-recover', (res: LeaveRecoverMessage) => {
                 if (res.sequence === seq) {
-                    resolve(res.potentialNeighbors.map(n => identityToVONNeighbor(n)));
+                    resolve([...res.potentialNeighbors.map(n => identityToVONNeighbor(n)), ...res.oneHopNeighbors.map(n => identityToVONNeighbor(n))]);
                 }
             });
         });

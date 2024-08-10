@@ -6,7 +6,7 @@ import { Delaunay, Voronoi } from 'd3-delaunay';
 import { VONConnection } from "./connection.js";
 import { Vector } from "~/spatial/vector.js";
 import { Identity } from "~/proto/generated/messages/vast/index.js";
-import { VONNeighbor, excludeNeighbors, filterOutNeighbor, identityToVONNeighbor, indexOfNeighbor } from "./neighbor.js";
+import { VONNeighbor, deduplicateNeighbors, excludeNeighbors, filterOutNeighbor, identityToVONNeighbor, indexOfNeighbor } from "./neighbor.js";
 import EventEmitter from "node:events";
 import winston from "winston";
 import { stringify } from "~/utils.js";
@@ -430,7 +430,7 @@ export class VONNode extends EventEmitter implements IVONNode {
 
         // 4. The node uses the complete set of *potential EN neighbors* from the *overlap neighbors* to update its *EN neighbors*.
         // 5. The *node* updates its *local Voronoi diagram* to reflect the new *EN neighbors*.
-        this.addMultipleNodes(potentialENs);
+        this.addMultipleNodes(filterOutNeighbor(deduplicateNeighbors(potentialENs), this.addr));
     }
 
     /**
