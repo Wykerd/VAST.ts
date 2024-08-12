@@ -8,9 +8,11 @@ Highly scalable peer-to-peer spatial publish/subscribe archtecture.
 
 - [Prerequisites](#prerequisites)
 - [Papers](#papers)
+- [Contributing](#contributing)
+- [Similar Projects](#similar-projects)
 - [License](#license)
 
-# Prequisites
+# Prerequisites
 
 This library is written in TypeScript and is intended to be used in a Node.js environment. It is recommended to have a basic understanding of TypeScript and Node.js before using this library.
 
@@ -28,6 +30,18 @@ This library is based on the work of the following research papers:
 
 - Jehn-Ruey Jiang, Yu-Li Huang & Shun-Yun Hu. 2008. Scalable AOI-Cast for Peer-to-Peer Networked Virtual Environments, in 2008 The 28th International Conference on Distributed Computing Systems Workshops, IEEE. 447–452. DOI: 10.1109/ICDCS.Workshops.2008.80.
 
+# Contributing
+
+Contribution of all kinds are welcome.
+
+Make sure to review the aforementioned papers if you're planning to contribute architectural features.
+
+# Similar Projects
+
+Existing libraries based on the same research is also available:
+
+- [VAST.js](https://github.com/vastverse/VAST.js)
+- [VAST](https://vast.sourceforge.net/)
 
 # License
 
